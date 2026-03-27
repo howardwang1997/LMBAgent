@@ -1,0 +1,54 @@
+# Battery Analysis Report
+
+**Generated:** {{ generated_at }}
+**Source File:** {{ source_file }}
+**Test Name:** {{ test_name or "N/A" }}
+**Start Time:** {{ start_datetime or "N/A" }}
+
+---
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Data Points | {{ num_data_points }} |
+| Total Cycles | {{ num_cycles }} |
+| Voltage Range | {{ voltage_min }} - {{ voltage_max }} V |
+| Current Range | {{ current_min }} - {{ current_max }} A |
+
+{% if cycle_summary is not none and cycle_summary|length > 0 %}
+## Cycle Performance
+
+| Cycle | Charge Cap (Ah) | Discharge Cap (Ah) | CE (%) | Capacity Retention (%) |
+|-------|-----------------|-------------------|--------|----------------------|
+{% for row in cycle_summary %}| {{ row.cycle_index }} | {{ "%.4f"|format(row.charge_capacity) }} | {{ "%.4f"|format(row.discharge_capacity) }} | {{ "%.2f"|format(row.coulombic_efficiency) }} | {{ "%.2f"|format(row.capacity_retention) }} |
+{% endfor %}
+{% endif %}
+
+## Visualizations
+
+### Capacity Fade
+![Capacity Fade]({{ capacity_plot }})
+
+### Coulombic Efficiency
+![Coulombic Efficiency]({{ efficiency_plot }})
+
+### Voltage Curves
+![Voltage Curves]({{ voltage_plot }})
+
+### Internal Resistance
+![Impedance]({{ impedance_plot }})
+
+---
+
+## Analysis Notes
+
+{% if analysis_notes %}
+{{ analysis_notes }}
+{% else %}
+- Data loaded from PEC CSV format with {{ num_data_points }} measurement points across {{ num_cycles }} cycles.
+{% if cycle_summary is not none and cycle_summary|length > 1 %}
+- Cycle 1 charge capacity: {{ "%.4f"|format(cycle_summary[1].charge_capacity) }} Ah, discharge capacity: {{ "%.4f"|format(cycle_summary[1].discharge_capacity) }} Ah.
+- Cycle 1 coulombic efficiency: {{ "%.2f"|format(cycle_summary[1].coulombic_efficiency) }}%.
+{% endif %}
+{% endif %}
