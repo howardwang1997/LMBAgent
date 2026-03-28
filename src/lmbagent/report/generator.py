@@ -9,7 +9,7 @@ import jinja2
 import markdown as md
 
 from lmbagent.data.models import BatteryDataset
-from lmbagent.data.transformer import add_cycle_summary
+from lmbagent.data.transformer import add_cycle_summary, compute_insights
 from lmbagent.visualization.capacity_plot import plot_capacity_fade
 from lmbagent.visualization.efficiency_plot import plot_coulombic_efficiency
 from lmbagent.visualization.voltage_plot import plot_voltage_curves
@@ -67,6 +67,9 @@ def generate_report(
     raw = dataset.raw_data
     summary_records = dataset.cycle_summary.to_dict("records") if not dataset.cycle_summary.empty else []
 
+    # Compute cross-cycle insights
+    insights = compute_insights(dataset)
+
     context = {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "source_file": dataset.source_file,
@@ -84,6 +87,7 @@ def generate_report(
         "voltage_plot": rel_volt,
         "impedance_plot": rel_imp,
         "analysis_notes": analysis_notes,
+        "insights": insights,
     }
 
     # Render template

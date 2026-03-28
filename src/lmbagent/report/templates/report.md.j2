@@ -15,14 +15,92 @@
 | Total Cycles | {{ num_cycles }} |
 | Voltage Range | {{ voltage_min }} - {{ voltage_max }} V |
 | Current Range | {{ current_min }} - {{ current_max }} A |
+{% if insights.total_test_time_h is defined %}| Total Test Time | {{ insights.total_test_time_h }} h |
+{% endif %}
+
+{% if insights.health_assessments is defined and insights.health_assessments|length > 0 %}
+## Key Findings
+
+{% for assessment in insights.health_assessments %}- {{ assessment }}
+{% endfor %}
+{% endif %}
 
 {% if cycle_summary is not none and cycle_summary|length > 0 %}
 ## Cycle Performance
 
-| Cycle | Charge Cap (Ah) | Discharge Cap (Ah) | CE (%) | Capacity Retention (%) |
-|-------|-----------------|-------------------|--------|----------------------|
-{% for row in cycle_summary %}| {{ row.cycle_index }} | {{ "%.4f"|format(row.charge_capacity) }} | {{ "%.4f"|format(row.discharge_capacity) }} | {{ "%.2f"|format(row.coulombic_efficiency) }} | {{ "%.2f"|format(row.capacity_retention) }} |
+| Cycle | Charge Cap (Ah) | Discharge Cap (Ah) | CE (%) | Energy Eff (%) | Capacity Retention (%) |
+|-------|-----------------|-------------------|--------|---------------|----------------------|
+{% for row in cycle_summary %}| {{ row.cycle_index }} | {{ "%.4f"|format(row.charge_capacity) }} | {{ "%.4f"|format(row.discharge_capacity) }} | {{ "%.2f"|format(row.coulombic_efficiency) }} | {{ "%.2f"|format(row.energy_efficiency) }} | {{ "%.2f"|format(row.capacity_retention) }} |
 {% endfor %}
+{% endif %}
+
+{% if insights.initial_discharge_cap is defined %}
+## Capacity Analysis
+
+| Metric | Value |
+|--------|-------|
+| Initial Charge Capacity | {{ insights.initial_charge_cap }} Ah |
+| Initial Discharge Capacity | {{ insights.initial_discharge_cap }} Ah |
+| Final Discharge Capacity | {{ insights.final_discharge_cap }} Ah |
+| Maximum Discharge Capacity | {{ insights.max_discharge_cap }} Ah (Cycle {{ insights.max_cap_cycle }}) |
+| Minimum Discharge Capacity | {{ insights.min_discharge_cap }} Ah (Cycle {{ insights.min_cap_cycle }}) |
+{% if insights.capacity_fade_pct is defined %}| Total Capacity Fade | {{ insights.capacity_fade_pct }}% |
+| Fade Rate | {{ insights.fade_rate_per_cycle }} mAh/cycle |
+| Final Retention | {{ insights.final_retention_pct }}% |
+{% endif %}
+{% endif %}
+
+{% if insights.ce_mean is defined %}
+## Efficiency Analysis
+
+**Coulombic Efficiency:**
+
+| Metric | Value |
+|--------|-------|
+| Mean CE | {{ insights.ce_mean }}% |
+| CE Std Dev | {{ insights.ce_std }}% |
+| Min CE | {{ insights.ce_min }}% (Cycle {{ insights.ce_min_cycle }}) |
+| Max CE | {{ insights.ce_max }}% (Cycle {{ insights.ce_max_cycle }}) |
+
+{% if insights.ee_mean is defined %}
+**Energy Efficiency:**
+
+| Metric | Value |
+|--------|-------|
+| Mean Energy Efficiency | {{ insights.ee_mean }}% |
+| Min Energy Efficiency | {{ insights.ee_min }}% |
+| Max Energy Efficiency | {{ insights.ee_max }}% |
+{% endif %}
+{% endif %}
+
+{% if insights.voltage_range is defined %}
+## Voltage Analysis
+
+| Metric | Value |
+|--------|-------|
+| Voltage Range | {{ insights.voltage_min }} - {{ insights.voltage_max }} V ({{ insights.voltage_range }} V span) |
+{% if insights.avg_end_v_charge is defined %}| Avg End-of-Charge Voltage | {{ insights.avg_end_v_charge }} V |
+{% endif %}{% if insights.avg_end_v_discharge is defined %}| Avg End-of-Discharge Voltage | {{ insights.avg_end_v_discharge }} V |
+{% endif %}{% if insights.avg_hysteresis is defined %}| Avg Voltage Hysteresis | {{ insights.avg_hysteresis }} V |
+{% endif %}
+
+{% if insights.voltage_hysteresis is defined and insights.voltage_hysteresis|length > 0 %}
+**Per-Cycle Voltage Hysteresis:**
+
+| Cycle | Hysteresis (V) |
+|-------|---------------|
+{% for h in insights.voltage_hysteresis %}| {{ h.cycle }} | {{ h.hysteresis }} |
+{% endfor %}
+{% endif %}
+{% endif %}
+
+{% if insights.ir_mean is defined %}
+## Impedance Analysis
+
+| Metric | Value |
+|--------|-------|
+| Mean Internal Resistance | {{ insights.ir_mean }} Ohm |
+| Resistance Trend | {{ insights.ir_trend }} |
 {% endif %}
 
 ## Visualizations
@@ -47,8 +125,7 @@
 {{ analysis_notes }}
 {% else %}
 - Data loaded from PEC CSV format with {{ num_data_points }} measurement points across {{ num_cycles }} cycles.
-{% if cycle_summary is not none and cycle_summary|length > 1 %}
-- Cycle 1 charge capacity: {{ "%.4f"|format(cycle_summary[1].charge_capacity) }} Ah, discharge capacity: {{ "%.4f"|format(cycle_summary[1].discharge_capacity) }} Ah.
-- Cycle 1 coulombic efficiency: {{ "%.2f"|format(cycle_summary[1].coulombic_efficiency) }}%.
-{% endif %}
-{% endif %}
+{% if insights.capacity_fade_pct is defined %}- Overall capacity fade: {{ insights.capacity_fade_pct }}% over {{ insights.total_cycles }} cycles ({{ insights.fade_rate_per_cycle }} mAh/cycle).
+{% endif %}{% if insights.ce_mean is defined %}- Average coulombic efficiency: {{ insights.ce_mean }}% (σ = {{ insights.ce_std }}%).
+{% endif %}{% if insights.avg_hysteresis is defined %}- Average voltage hysteresis: {{ insights.avg_hysteresis }} V, indicating {{ "low" if insights.avg_hysteresis < 0.1 else ("moderate" if insights.avg_hysteresis < 0.3 else "high") }} polarization.
+{% endif %}{% endif %}

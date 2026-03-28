@@ -74,3 +74,131 @@ def add_cycle_summary(dataset: BatteryDataset) -> BatteryDataset:
     """Compute and attach cycle summary to dataset. Returns the same dataset."""
     dataset.cycle_summary = compute_cycle_summary(dataset)
     return dataset
+
+
+def compute_insights(dataset: BatteryDataset) -> dict:
+    """Compute cross-cycle analytical insights from dataset.
+
+    Returns a dict of computed metrics for report generation.
+    """
+    insights: dict = {}
+    df = dataset.raw_data
+    cs = dataset.cycle_summary
+
+    if cs.empty:
+        return insights
+
+    # --- Basic stats ---
+    insights["total_cycles"] = len(cs)
+    insights["total_data_points"] = len(df)
+    if "test_time" in df.columns:
+        total_time_s = df["test_time"].max() - df["test_time"].min()
+        insights["total_test_time_h"] = round(total_time_s / 3600, 2)
+
+    # --- Capacity Analysis ---
+    valid = cs[cs["discharge_capacity"] > 0]
+    if len(valid) >= 1:
+        insights["initial_charge_cap"] = round(valid.iloc[0]["charge_capacity"], 6)
+        insights["initial_discharge_cap"] = round(valid.iloc[0]["discharge_capacity"], 6)
+        insights["final_discharge_cap"] = round(valid.iloc[-1]["discharge_capacity"], 6)
+        insights["max_discharge_cap"] = round(valid["discharge_capacity"].max(), 6)
+        insights["max_cap_cycle"] = int(valid.loc[valid["discharge_capacity"].idxmax(), "cycle_index"])
+        insights["min_discharge_cap"] = round(valid["discharge_capacity"].min(), 6)
+        insights["min_cap_cycle"] = int(valid.loc[valid["discharge_capacity"].idxmin(), "cycle_index"])
+
+        if len(valid) >= 2:
+            cap_first = valid.iloc[0]["discharge_capacity"]
+            cap_last = valid.iloc[-1]["discharge_capacity"]
+            n_cycles = valid.iloc[-1]["cycle_index"] - valid.iloc[0]["cycle_index"]
+            if cap_first > 0 and n_cycles > 0:
+                insights["capacity_fade_pct"] = round((1 - cap_last / cap_first) * 100, 2)
+                insights["fade_rate_per_cycle"] = round(
+                    (cap_first - cap_last) / n_cycles * 1000, 4  # mAh/cycle
+                )
+            insights["final_retention_pct"] = round(cap_last / cap_first * 100, 2) if cap_first > 0 else 0
+
+    # --- Coulombic Efficiency Analysis ---
+    ce_valid = cs[(cs["coulombic_efficiency"] > 0) & (cs["coulombic_efficiency"] <= 200)]
+    if len(ce_valid) >= 1:
+        insights["ce_mean"] = round(ce_valid["coulombic_efficiency"].mean(), 2)
+        insights["ce_std"] = round(ce_valid["coulombic_efficiency"].std(), 2) if len(ce_valid) > 1 else 0.0
+        insights["ce_min"] = round(ce_valid["coulombic_efficiency"].min(), 2)
+        insights["ce_min_cycle"] = int(ce_valid.loc[ce_valid["coulombic_efficiency"].idxmin(), "cycle_index"])
+        insights["ce_max"] = round(ce_valid["coulombic_efficiency"].max(), 2)
+        insights["ce_max_cycle"] = int(ce_valid.loc[ce_valid["coulombic_efficiency"].idxmax(), "cycle_index"])
+
+    # --- Energy Efficiency ---
+    ee_valid = cs[(cs["energy_efficiency"] > 0) & (cs["energy_efficiency"] <= 200)]
+    if len(ee_valid) >= 1:
+        insights["ee_mean"] = round(ee_valid["energy_efficiency"].mean(), 2)
+        insights["ee_min"] = round(ee_valid["energy_efficiency"].min(), 2)
+        insights["ee_max"] = round(ee_valid["energy_efficiency"].max(), 2)
+
+    # --- Voltage Analysis ---
+    if "voltage" in df.columns:
+        insights["voltage_min"] = round(df["voltage"].min(), 4)
+        insights["voltage_max"] = round(df["voltage"].max(), 4)
+        insights["voltage_range"] = round(df["voltage"].max() - df["voltage"].min(), 4)
+
+        # Voltage hysteresis per cycle (avg charge voltage - avg discharge voltage)
+        hysteresis_list = []
+        for cycle_idx, group in df.groupby("cycle_index"):
+            charge_v = group.loc[group["current"] > 0, "voltage"]
+            discharge_v = group.loc[group["current"] < 0, "voltage"]
+            if len(charge_v) > 0 and len(discharge_v) > 0:
+                hysteresis_list.append({
+                    "cycle": int(cycle_idx),
+                    "hysteresis": round(charge_v.mean() - discharge_v.mean(), 4),
+                })
+        if hysteresis_list:
+            insights["voltage_hysteresis"] = hysteresis_list
+            insights["avg_hysteresis"] = round(
+                sum(h["hysteresis"] for h in hysteresis_list) / len(hysteresis_list), 4
+            )
+
+    # --- End Voltage Analysis ---
+    ev_charge = cs["end_voltage_charge"].dropna()
+    ev_discharge = cs["end_voltage_discharge"].dropna()
+    if len(ev_charge) > 0:
+        insights["avg_end_v_charge"] = round(ev_charge.mean(), 4)
+    if len(ev_discharge) > 0:
+        insights["avg_end_v_discharge"] = round(ev_discharge.mean(), 4)
+
+    # --- Internal Resistance ---
+    ir_valid = cs[cs["ir_charge"] > 0]
+    if len(ir_valid) >= 1:
+        insights["ir_mean"] = round(ir_valid["ir_charge"].mean(), 4)
+        insights["ir_trend"] = "increasing" if len(ir_valid) >= 2 and ir_valid["ir_charge"].iloc[-1] > ir_valid["ir_charge"].iloc[0] else "stable"
+
+    # --- Health Assessment ---
+    assessments = []
+    if "capacity_fade_pct" in insights:
+        fade = insights["capacity_fade_pct"]
+        if fade < 5:
+            assessments.append("Excellent capacity retention — minimal degradation observed.")
+        elif fade < 15:
+            assessments.append("Moderate capacity fade — cell is aging within normal parameters.")
+        else:
+            assessments.append("Significant capacity fade — cell may be approaching end of life.")
+
+    if "ce_mean" in insights:
+        ce = insights["ce_mean"]
+        if ce > 99.5:
+            assessments.append("Coulombic efficiency is excellent, indicating minimal side reactions.")
+        elif ce > 98:
+            assessments.append("Coulombic efficiency is good but some irreversible capacity loss per cycle.")
+        else:
+            assessments.append("Low coulombic efficiency suggests significant parasitic reactions or lithium loss.")
+
+    if "avg_hysteresis" in insights:
+        h = insights["avg_hysteresis"]
+        if h < 0.1:
+            assessments.append("Low voltage hysteresis indicates good kinetics and low polarization.")
+        elif h < 0.3:
+            assessments.append("Moderate voltage hysteresis — some polarization losses present.")
+        else:
+            assessments.append("High voltage hysteresis suggests significant internal resistance or slow kinetics.")
+
+    insights["health_assessments"] = assessments
+
+    return insights
