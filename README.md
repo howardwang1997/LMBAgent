@@ -12,6 +12,16 @@ Lithium Metal Battery Data Analysis Agent — an AI-powered tool for loading, an
 - **Caching**: Plots generated once per session per dataset
 - **Organized output**: Each analysis in `output/<timestamp>_<data_id>/`
 
+## Example Output
+
+A pre-generated example report (produced from `data/examples/pec.csv`) is available in [`docs/example_output/`](docs/example_output/report_pec.md), including:
+
+- **[`report_pec.md`](docs/example_output/report_pec.md)** — full Markdown report with cycle performance, capacity, efficiency, and voltage analysis
+- **[`plots/capacity_fade.png`](docs/example_output/plots/capacity_fade.png)** — charge/discharge capacity per cycle
+- **[`plots/coulombic_efficiency.png`](docs/example_output/plots/coulombic_efficiency.png)** — coulombic & energy efficiency per cycle
+- **[`plots/voltage_curves.png`](docs/example_output/plots/voltage_curves.png)** — voltage vs. capacity curves
+- **[`plots/impedance.png`](docs/example_output/plots/impedance.png)** — internal resistance per cycle
+
 ## Quick Start
 
 ```bash
