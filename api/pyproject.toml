@@ -1,0 +1,16 @@
+[project]
+name = "lmbagent-api"
+version = "0.1.0"
+description = "FastAPI backend for LMBAgent web frontend"
+dependencies = [
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.23",
+    "python-multipart>=0.0.6",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
