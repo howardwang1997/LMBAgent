@@ -62,10 +62,12 @@ def render_upload_page():
                         c1, c2 = st.columns(2)
                         with c1:
                             if st.button("📊 查看数据集", key="goto_datasets"):
-                                st.switch_page("page_datasets.py")
+                                st.session_state.selected_page = "📊 数据集管理"
+                                st.rerun()
                         with c2:
                             if st.button("📈 生成可视化", key="goto_viz"):
-                                st.switch_page("page_visualization.py")
+                                st.session_state.selected_page = "📈 可视化"
+                                st.rerun()
 
                     except Exception as e:
                         st.error(f"❌ 上传失败: {str(e)}")
@@ -75,16 +77,22 @@ def render_upload_page():
 
         # Show example
         with st.expander("示例数据格式"):
+            st.markdown("**PEC CSV 格式示例:**")
+            st.dataframe(
+                {
+                    "DataPoint": [0, 1, 2],
+                    "Cycle": [0, 0, 0],
+                    "Step": [0, 0, 0],
+                    "Test_Time": [0, 1, 2],
+                    "Step_Time": [0, 1, 2],
+                    "Voltage": [3.5, 3.6, 3.7],
+                    "Current": [0.0, 0.0, 0.0],
+                },
+                use_container_width=True,
+                hide_index=True,
+            )
+
             st.markdown("""
-            **PEC CSV 格式示例:**
-
-            ```csv
-            # DataPoint,Cycle,Step,Test_Time,Step_Time,Voltage,Current,...
-            0,0,0,0,0,3.5,0,...
-            1,0,0,1,1,3.6,0,...
-            ...
-            ```
-
             **必需列:**
             - `Voltage` (V)
             - `Current` (A)

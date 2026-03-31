@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Ensure project root is on sys.path so "web.app.views.*" imports work
+_project_root = str(Path(__file__).parent.parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 import streamlit as st
 
 st.set_page_config(
@@ -58,21 +66,21 @@ with st.sidebar:
 
 # Page routing
 if page == "📤 上传数据":
-    from web.app.pages.page_upload import render_upload_page
+    from web.app.views.page_upload import render_upload_page
     render_upload_page()
 
 elif page == "📊 数据集管理":
-    from web.app.pages.page_datasets import render_datasets_page
+    from web.app.views.page_datasets import render_datasets_page
     render_datasets_page()
 
 elif page == "📈 可视化":
-    from web.app.pages.page_visualization import render_visualization_page
+    from web.app.views.page_visualization import render_visualization_page
     render_visualization_page()
 
 elif page == "📄 报告生成":
-    from web.app.pages.page_report import render_report_page
+    from web.app.views.page_report import render_report_page
     render_report_page()
 
 elif page == "🤖 AI 聊天":
-    from web.app.pages.page_chat import render_chat_page
+    from web.app.views.page_chat import render_chat_page
     render_chat_page()

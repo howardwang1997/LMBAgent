@@ -34,12 +34,14 @@ def render_dataset_card(dataset: dict):
         with col2:
             if st.button("📈 可视化", key=f"viz_{data_id}", use_container_width=True):
                 st.session_state.active_dataset_id = data_id
-                st.switch_page("page_visualization.py")
+                st.session_state.selected_page = "📈 可视化"
+                st.rerun()
 
         with col3:
             if st.button("📄 报告", key=f"report_{data_id}", use_container_width=True):
                 st.session_state.active_dataset_id = data_id
-                st.switch_page("page_report.py")
+                st.session_state.selected_page = "📄 报告生成"
+                st.rerun()
 
         with col4:
             if st.button("🗑️ 删除", key=f"delete_{data_id}", use_container_width=True, type="secondary"):
@@ -79,7 +81,8 @@ def render_datasets_page():
     if not datasets:
         st.info("暂无数据集。请先上传数据。")
         if st.button("📤 上传数据", type="primary"):
-            st.switch_page("page_upload.py")
+            st.session_state.selected_page = "📤 上传数据"
+            st.rerun()
         return
 
     # Summary

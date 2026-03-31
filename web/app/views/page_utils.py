@@ -15,15 +15,6 @@ def check_dataset_selected() -> str | None:
     if not data_id:
         st.warning("⚠️ 请先选择一个数据集")
         st.info("前往「数据集管理」页面查看可用数据集，或上传新数据。")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("📊 数据集管理", type="secondary"):
-                st.switch_page("page_datasets.py")
-        with col2:
-            if st.button("📤 上传数据", type="secondary"):
-                st.switch_page("page_upload.py")
-
         return None
     return data_id
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import streamlit as st
 from web.app.utils.api_client import chat_message, chat_stream_iter
-from web.app.pages.page_utils import check_dataset_selected
 
 
 def render_chat_page():

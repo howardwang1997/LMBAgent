@@ -69,7 +69,7 @@ class PlotService:
         elif plot_type == "voltage_curves":
             cycles = kwargs.get("cycles")
             if cycles:
-                plot_func(dataset, output_path=plot_path, cycles=cycles)
+                plot_func(dataset, output_path=plot_path, cycle_numbers=cycles)
             else:
                 plot_func(dataset, output_path=plot_path)
         else:

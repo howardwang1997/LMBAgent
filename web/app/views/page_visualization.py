@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 from web.app.utils.api_client import get_plot, decode_base64_image
-from web.app.pages.page_utils import check_dataset_selected
+from web.app.views.page_utils import check_dataset_selected
 
 
 def render_visualization_page():

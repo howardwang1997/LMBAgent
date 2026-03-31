@@ -43,6 +43,8 @@ class ReportService:
             "download_url": f"/api/reports/download/{data_id}/{output_format}",
         }
 
+    _EXT_MAP = {"markdown": "md", "html": "html", "pdf": "pdf"}
+
     def get_report_path(self, data_id: str, output_format: str) -> Path:
         """Get the path to an existing report."""
         dataset = self._store.get(data_id)
@@ -50,7 +52,8 @@ class ReportService:
             raise ValueError(f"Dataset {data_id} not found")
 
         output_dir = get_output_dir(data_id)
-        report_path = output_dir / f"report_{data_id}.{output_format}"
+        ext = self._EXT_MAP.get(output_format, output_format)
+        report_path = output_dir / f"report_{data_id}.{ext}"
 
         if not report_path.exists():
             raise FileNotFoundError(f"Report not found: {report_path}")

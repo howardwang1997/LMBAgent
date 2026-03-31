@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import streamlit as st
 from pathlib import Path
-from web.app.utils.api_client import generate_report, download_report
-from web.app.pages.page_utils import check_dataset_selected, render_insights_cards
-from web.app.pages.page_datasets import list_datasets
+from web.app.utils.api_client import generate_report, download_report, list_datasets
+from web.app.views.page_utils import check_dataset_selected
 
 
 def render_report_page():
