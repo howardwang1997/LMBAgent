@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import litellm
 
@@ -39,6 +39,7 @@ async def run_litellm_agent(
     provider: Optional[str] = None,
     cwd: Optional[str] = None,
     max_turns: int = 20,
+    on_event: Optional[Callable[[dict], None]] = None,
 ) -> str:
     """Run the LMB agent using LiteLLM with tool calling.
 
@@ -114,8 +115,12 @@ async def run_litellm_agent(
                 tool_result = f"Error: Unknown tool '{func_name}'"
             else:
                 print(f"  [Tool] {func_name}({json.dumps(func_args, ensure_ascii=False)[:100]})")
+                if on_event:
+                    on_event({"type": "tool", "tool_name": func_name, "tool_args": func_args})
                 result = await handler(func_args)
                 tool_result = _result_to_text(result)
+                if on_event:
+                    on_event({"type": "tool_result", "tool_name": func_name, "result": tool_result[:500]})
 
             messages.append({
                 "role": "tool",

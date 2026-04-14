@@ -122,22 +122,25 @@ def _generate_plot_if_missing(path: Path, generate_fn) -> None:
 
 
 def _wrap_html(body: str) -> str:
-    """Wrap HTML body with a styled document for PDF/HTML output."""
+    """Wrap HTML body with dark-theme styling matching HKAI-Cycling UI."""
     return f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <style>
-body {{ font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; margin: 40px; color: #333; line-height: 1.6; }}
-h1 {{ color: #1a1a1a; border-bottom: 2px solid #2196F3; padding-bottom: 8px; }}
-h2 {{ color: #2196F3; margin-top: 30px; }}
-h3 {{ color: #555; }}
-table {{ border-collapse: collapse; width: 100%; margin: 16px 0; }}
-th, td {{ border: 1px solid #ddd; padding: 8px 12px; text-align: left; }}
-th {{ background-color: #2196F3; color: white; }}
-tr:nth-child(even) {{ background-color: #f9f9f9; }}
-img {{ max-width: 100%; height: auto; margin: 16px 0; border: 1px solid #eee; border-radius: 4px; }}
-hr {{ border: none; border-top: 1px solid #eee; margin: 24px 0; }}
+body {{ font-family: -apple-system, 'Helvetica Neue', 'PingFang SC', Arial, sans-serif; margin: 24px; background: #030d1f; color: #e8f4ff; line-height: 1.6; }}
+h1 {{ color: #00e5ff; border-bottom: 1px solid rgba(0,168,255,0.3); padding-bottom: 8px; font-size: 18px; }}
+h2 {{ color: #00a8ff; margin-top: 24px; font-size: 15px; }}
+h3 {{ color: #7ab3d4; font-size: 13px; }}
+p, li {{ font-size: 13px; color: #b0d4ef; }}
+table {{ border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12px; }}
+th, td {{ border: 1px solid rgba(0,168,255,0.22); padding: 6px 10px; text-align: left; }}
+th {{ background: rgba(0,168,255,0.15); color: #00e5ff; font-weight: 600; }}
+tr:nth-child(even) {{ background: rgba(0,168,255,0.04); }}
+img {{ max-width: 100%; height: auto; margin: 12px 0; border: 1px solid rgba(0,168,255,0.22); border-radius: 4px; }}
+hr {{ border: none; border-top: 1px solid rgba(0,168,255,0.15); margin: 20px 0; }}
+strong {{ color: #e8f4ff; }}
+code {{ background: rgba(0,168,255,0.08); padding: 1px 4px; border-radius: 3px; font-size: 12px; color: #00e5ff; }}
 </style>
 </head>
 <body>

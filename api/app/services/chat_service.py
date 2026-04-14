@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 
 from lmbagent.agent import TOOL_REGISTRY
 from lmbagent.litellm_backend import run_litellm_agent
@@ -13,7 +12,6 @@ class ChatService:
     """Service for LLM chat with tool execution."""
 
     def __init__(self):
-        # Get tool descriptions for system prompt context
         self.tool_descriptions = [
             {"name": tool["name"], "description": tool["description"]}
             for tool in TOOL_REGISTRY
@@ -22,33 +20,38 @@ class ChatService:
     async def stream_response(
         self, message: str, dataset_id: str | None = None, model: str = "grok-4-1-fast-reasoning"
     ):
-        """Stream LLM response with tool execution."""
-        # Build prompt with dataset context
+        """Stream LLM response with tool execution via asyncio.Queue bridge."""
         prompt = message
         if dataset_id:
             prompt = f"The user is working with dataset '{dataset_id}'.\n\nUser query: {message}"
 
-        try:
-            # Run the agent and stream results
-            # Note: run_litellm_agent returns the final result text
-            # We need to capture intermediate tool calls for streaming
-            result = await run_litellm_agent(
-                prompt=prompt,
-                model=model,
-                provider=None,
-                cwd=None,
-            )
+        queue: asyncio.Queue = asyncio.Queue()
 
-            # For now, yield the final result
-            # TODO: Enhance litellm_backend to support streaming callbacks
-            yield {
-                "type": "content",
-                "content": result,
-            }
-            yield {"type": "done"}
+        def on_event(event: dict):
+            queue.put_nowait(event)
 
-        except Exception as e:
-            yield {
-                "type": "error",
-                "error": str(e),
-            }
+        async def run_agent():
+            try:
+                result = await run_litellm_agent(
+                    prompt=prompt,
+                    model=model,
+                    provider=None,
+                    cwd=None,
+                    on_event=on_event,
+                )
+                await queue.put({"type": "content", "content": result})
+            except Exception as e:
+                await queue.put({"type": "error", "error": str(e)})
+            finally:
+                await queue.put(None)
+
+        task = asyncio.create_task(run_agent())
+
+        while True:
+            event = await queue.get()
+            if event is None:
+                break
+            yield event
+
+        yield {"type": "done"}
+        await task

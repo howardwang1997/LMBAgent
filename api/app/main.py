@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.app.api import datasets, plots, reports, chat
+from api.app.api import datasets, plots, reports, chat, settings
 
 app = FastAPI(
     title="LMBAgent API",
@@ -22,7 +22,7 @@ app = FastAPI(
 # CORS for Streamlit frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8501", "http://localhost:8502"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,6 +33,21 @@ app.include_router(datasets.router, prefix="/api")
 app.include_router(plots.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(settings.router, prefix="/api")
+
+
+@app.on_event("startup")
+def load_demo_data():
+    from api.app.services.dataset_service import DatasetService
+    svc = DatasetService()
+    examples_dir = Path(__file__).parent.parent.parent / "data" / "examples"
+    for filename, data_id in [("pec.csv", "pec"), ("pec_100cycles.csv", "lmb100")]:
+        csv_path = examples_dir / filename
+        if csv_path.exists():
+            try:
+                svc.load_from_file(str(csv_path), data_id=data_id)
+            except Exception:
+                pass
 
 
 @app.get("/")

@@ -655,6 +655,14 @@
             </div>
             <div class="dropdown-check" id="checkLife" style="display:none">✓</div>
           </div>
+          <div class="dropdown-item" id="ddCycling" onclick="switchSystem('cycling', event)">
+            <div class="dropdown-item-icon" style="background:rgba(0,168,255,0.1)">📈</div>
+            <div>
+              <div class="dropdown-item-name">HKAI-Cycling</div>
+              <div class="dropdown-item-desc">电池循环数据分析系统</div>
+            </div>
+            <div class="dropdown-check" id="checkCycling" style="display:none">✓</div>
+          </div>
         </div>
       </div>
     </div>
@@ -672,6 +680,11 @@
         <div class="status-badge"><div class="status-dot"></div>Agent 在线</div>
         <div class="topbar-tag" id="chemTag">LFP · 磷酸铁锂</div>
         <div class="topbar-tag" id="cellTag">LFP-A01</div>
+      </div>
+      <!-- Cycling tags -->
+      <div id="cyclingTags" style="display:none;align-items:center;gap:10px;">
+        <div class="status-badge"><div class="status-dot"></div>API 在线</div>
+        <div class="topbar-tag">循环数据 · 可视化 · AI 分析</div>
       </div>
       <!-- Intro button -->
       <button class="intro-btn" onclick="openPPT()">📋 系统介绍</button>
@@ -1018,6 +1031,11 @@
     </div>
   </div>
 
+  <!-- ===== CYCLING PANEL ===== -->
+  <div class="system-panel" id="cyclingPanel">
+    <iframe src="web_html/index.html" style="width:100%;height:100%;border:none;background:#030d1f;"></iframe>
+  </div>
+
   <!-- ===== PPT OVERLAY ===== -->
   <div class="ppt-overlay" id="pptOverlay">
     <div class="ppt-topbar">
@@ -1058,25 +1076,27 @@ function switchSystem(sys, e) {
   // Update dropdown UI
   document.getElementById('ddBattery').classList.toggle('active', sys === 'battery');
   document.getElementById('ddLife').classList.toggle('active', sys === 'life');
+  document.getElementById('ddCycling').classList.toggle('active', sys === 'cycling');
   document.getElementById('checkBattery').style.display = sys === 'battery' ? '' : 'none';
   document.getElementById('checkLife').style.display = sys === 'life' ? '' : 'none';
+  document.getElementById('checkCycling').style.display = sys === 'cycling' ? '' : 'none';
 
   // Update system name
-  if (sys === 'battery') {
-    document.getElementById('sysNameMain').textContent = 'HKAI-Battery';
-    document.getElementById('sysNameSub').textContent = '电池新材料智能发现系统';
-    document.getElementById('batteryTags').style.display = 'flex';
-    document.getElementById('lifeTags').style.display = 'none';
-  } else {
-    document.getElementById('sysNameMain').textContent = 'HKAI-Life';
-    document.getElementById('sysNameSub').textContent = '电池寿命预测与可靠性分析系统';
-    document.getElementById('batteryTags').style.display = 'none';
-    document.getElementById('lifeTags').style.display = 'flex';
-  }
+  const sysNames = {
+    battery: ['HKAI-Battery', '电池新材料智能发现系统'],
+    life: ['HKAI-Life', '电池寿命预测与可靠性分析系统'],
+    cycling: ['HKAI-Cycling', '电池循环数据分析系统'],
+  };
+  document.getElementById('sysNameMain').textContent = sysNames[sys][0];
+  document.getElementById('sysNameSub').textContent = sysNames[sys][1];
+  document.getElementById('batteryTags').style.display = sys === 'battery' ? 'flex' : 'none';
+  document.getElementById('lifeTags').style.display = sys === 'life' ? 'flex' : 'none';
+  document.getElementById('cyclingTags').style.display = sys === 'cycling' ? 'flex' : 'none';
 
   // Show/hide panels
   document.getElementById('batteryPanel').classList.toggle('active', sys === 'battery');
   document.getElementById('lifePanel').classList.toggle('active', sys === 'life');
+  document.getElementById('cyclingPanel').classList.toggle('active', sys === 'cycling');
 
   // Close dropdown
   document.getElementById('sysNameWrap').classList.remove('open');

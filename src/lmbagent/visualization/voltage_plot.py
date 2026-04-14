@@ -58,7 +58,6 @@ def plot_voltage_curves(
     ax.set_xlabel("Capacity (Ah)")
     ax.set_ylabel("Voltage (V)")
     ax.set_title("Voltage vs Capacity")
-    ax.legend()
 
     if output_path is None:
         output_path = Path("output") / f"voltage_curves_{dataset.data_id}.png"

@@ -30,7 +30,7 @@ async def chat_stream(
 
     return StreamingResponse(
         event_generator(),
-        media_type="text/event-source",
+        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",

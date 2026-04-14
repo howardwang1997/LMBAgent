@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HKAI-Cycling · 电池循环数据分析</title>
+<link rel="stylesheet" href="styles.css?v=2">
+</head>
+<body>
+
+<div class="app-grid">
+  <!-- ===== LEFT SIDEBAR: Data Upload + Management ===== -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">HKAI-Cycling</div>
+      <div class="sidebar-sub">电池循环数据分析系统</div>
+    </div>
+
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-zone-icon">📂</div>
+      <div class="upload-zone-text">点击或拖拽上传 CSV</div>
+      <div class="upload-zone-hint">支持 PEC (cellpy) 格式</div>
+      <input type="file" id="fileInput" accept=".csv" hidden>
+    </div>
+
+    <div class="dataset-list-header">数据集列表</div>
+    <div class="dataset-list" id="datasetList">
+      <div class="plot-placeholder" style="padding:20px;">暂无数据集</div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN AREA ===== -->
+  <div class="main-area">
+    <!-- TOP: Plot Analysis -->
+    <div class="top-area">
+      <div class="section-header">
+        <div class="section-title">图表分析</div>
+        <div class="section-badge" id="plotDatasetBadge">未选择数据集</div>
+      </div>
+      <div class="plot-toolbar">
+        <div class="plot-tabs" id="plotTabs">
+          <button class="plot-tab active" data-type="capacity_fade">容量衰减</button>
+          <button class="plot-tab active" data-type="coulombic_efficiency">库伦效率</button>
+          <button class="plot-tab active" data-type="voltage_curves">电压曲线</button>
+          <button class="plot-tab active" data-type="impedance">阻抗</button>
+        </div>
+        <div class="plot-params" id="plotParams">
+          <label class="param-label" style="display:flex;align-items:center;gap:4px;">
+            <input type="checkbox" class="param-checkbox" id="paramNormalize"> 归一化
+          </label>
+          <input class="param-input" id="paramCycles" placeholder="循环号 (如 1,2,3)">
+          <button class="btn-generate" id="btnPlot" onclick="app.generatePlots()">生成图表</button>
+        </div>
+      </div>
+      <div class="plot-grid" id="plotGrid">
+        <div class="plot-cell" id="plot-capacity_fade"><div class="plot-placeholder">容量衰减</div></div>
+        <div class="plot-cell" id="plot-coulombic_efficiency"><div class="plot-placeholder">库伦效率</div></div>
+        <div class="plot-cell" id="plot-voltage_curves"><div class="plot-placeholder">电压曲线</div></div>
+        <div class="plot-cell" id="plot-impedance"><div class="plot-placeholder">阻抗</div></div>
+      </div>
+    </div>
+
+    <!-- BOTTOM: Chat (left) + Report (right) -->
+    <div class="bottom-area">
+      <!-- Chat -->
+      <div class="bottom-left">
+        <div class="chat-header">
+          <div class="section-title">AI 分析助手</div>
+          <button class="settings-toggle" id="settingsToggle" onclick="app.toggleSettings()">⚙</button>
+        </div>
+        <div class="settings-panel" id="settingsPanel">
+          <div class="settings-row">
+            <span class="settings-label">Provider</span>
+            <select class="settings-select" id="settProvider">
+              <option value="grok">Grok (xAI)</option>
+              <option value="openai">OpenAI</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Model</span>
+            <input class="settings-input" id="settModel" placeholder="如 grok-4-1-fast-reasoning">
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">API Key</span>
+            <input class="settings-input" id="settApiKey" type="password" placeholder="sk-...">
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Base URL</span>
+            <input class="settings-input" id="settBaseUrl" placeholder="(可选) https://api.x.ai/v1">
+          </div>
+          <button class="btn-save-settings" onclick="app.saveSettings()">保存配置</button>
+        </div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-row">
+          <div class="chat-input-wrap">
+            <input class="chat-input" id="chatInput" type="text"
+              placeholder="请描述分析需求..."
+              onkeydown="if(event.key==='Enter') app.sendChat()">
+          </div>
+          <button class="send-btn" onclick="app.sendChat()">发送</button>
+        </div>
+      </div>
+
+      <!-- Report -->
+      <div class="bottom-right">
+        <div class="section-header">
+          <div class="section-title">分析报告</div>
+          <button class="btn-generate" onclick="app.generateReport()" id="btnReport">生成报告</button>
+        </div>
+        <div class="report-form">
+          <textarea class="report-notes" id="reportNotes" placeholder="分析备注 (可选)..." style="height:40px;"></textarea>
+        </div>
+        <div class="report-preview-wrap" id="reportPreviewWrap">
+          <div class="report-status" id="reportStatus">选择数据集后可生成分析报告</div>
+          <iframe class="report-preview" id="reportPreview" style="display:none;"></iframe>
+        </div>
+        <div class="download-btns" id="downloadBtns" style="display:none;">
+          <button class="dl-btn" onclick="app.downloadReport('markdown')">📝 Markdown</button>
+          <button class="dl-btn" onclick="app.downloadReport('html')">🌐 HTML</button>
+          <button class="dl-btn" onclick="app.downloadReport('pdf')">📄 PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="api.js?v=2"></script>
+<script src="app.js?v=2"></script>
+</body>
+</html>
