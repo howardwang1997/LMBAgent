@@ -57,7 +57,7 @@ async def run_litellm_agent(
     # LiteLLM model format: for providers with custom base_url,
     # use "openai/<model>" prefix to route through OpenAI-compatible endpoint
     litellm_model = model
-    if config["provider"] in ("GROK", "DEEPSEEK") and config.get("base_url"):
+    if config["provider"] in ("GROK", "DEEPSEEK", "HKRI") and config.get("base_url"):
         litellm_model = f"openai/{model}"
 
     tools = [_to_openai_tool(t) for t in TOOL_REGISTRY]

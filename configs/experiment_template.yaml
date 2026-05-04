@@ -1,0 +1,67 @@
+# Experiment Design Metadata Template
+# Fill in the fields that apply to your experiment. Leave others blank/null.
+# This file should be placed alongside the experiment data file with the same base name.
+# Example: cell_A01.csv + cell_A01_design.yaml
+
+# === Cell Identity ===
+cell_id: "A01"                          # Required: unique cell identifier
+chemistry: "LMB-NMC811"                 # Required: e.g. "LMB-NMC811", "LMB-LFP", "NMB-Na3V2(PO4)3"
+form_factor: "pouch"                    # "pouch", "coin", "cylindrical"
+design_capacity_ah: 3.0                 # Nominal cell capacity
+voltage_range: [2.5, 4.2]              # [V_min, V_max]
+
+# === Positive Electrode ===
+positive_electrode:
+  thickness_um: 70.0                    # Electrode thickness (μm)
+  porosity: 0.35                        # Volume fraction porosity
+  particle_radius_um: 5.0              # Average particle radius (μm)
+  active_material: "NMC811"            # Active material type
+  loading_mg_cm2: 20.0                 # Areal loading (mg/cm²)
+  conductivity_s_m: null               # Electrode conductivity (S/m)
+  np_ratio: null                        # N/P ratio
+
+# === Negative Electrode ===
+negative_electrode:
+  type: "Li_metal"                      # "Li_metal", "Na_metal", "graphite", "hard_carbon"
+  thickness_um: 20.0                    # Electrode thickness (μm)
+  porosity: null                        # For intercalation anodes
+  particle_radius_um: null
+
+# === Electrolyte ===
+electrolyte:
+  salt: "LiPF6"                         # Salt type
+  concentration_mol_l: 1.0             # Salt concentration (mol/L)
+  solvent: "EC:DMC 3:7"               # Solvent composition
+  additives: null                       # e.g. "VC 2wt%, FEC 10wt%"
+  volume_ml: null                       # Electrolyte volume
+
+# === Separator ===
+separator:
+  type: "PE"                            # Separator material
+  thickness_um: 15.0                    # Thickness (μm)
+
+# === Formation Protocol ===
+formation:
+  c_rates: [0.1, 0.2]                  # Formation C-rates
+  temperature_c: 25.0                   # Formation temperature (°C)
+  cycles: 3                             # Number of formation cycles
+  voltage_range: [2.5, 4.2]            # Formation voltage range
+  rest_time_s: null                     # Rest between half-cycles
+
+# === Test Conditions ===
+test:
+  c_rates: [0.5, 1.0, 2.0]            # Test C-rates
+  temperature_c: 25.0                   # Test temperature (°C)
+  num_cycles: null                       # Planned cycle count
+  protocol: "CC-CV"                    # "CC", "CC-CV", "CCCV"
+  cv_cutoff_current_a: null            # CV phase cutoff current
+
+# === Additional Notes ===
+notes: ""                               # Free text notes
+experimenter: ""                        # Who performed the experiment
+date: null                              # Experiment date (YYYY-MM-DD)
+
+# === Custom Fields (extensible) ===
+custom: {}
+#  key1: value1
+#  key2: value2

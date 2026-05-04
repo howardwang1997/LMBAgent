@@ -17,6 +17,10 @@ dependencies = [
     "claude-agent-sdk",
     "litellm>=1.0",
     "python-dotenv",
+    "pyyaml>=6.0",
+    "scipy>=1.11",
+    "numpy>=1.24",
+    "openpyxl>=3.0",
 ]
 
 [project.optional-dependencies]

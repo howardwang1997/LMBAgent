@@ -6,8 +6,8 @@ from unittest.mock import patch
 from lmbagent.config import get_model_config, DEFAULT_MODEL
 
 
-def test_default_model_is_grok():
-    assert "grok" in DEFAULT_MODEL.lower()
+def test_default_model_is_minimax():
+    assert "minimax" in DEFAULT_MODEL.lower()
 
 
 def test_grok_provider_inference():

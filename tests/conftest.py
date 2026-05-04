@@ -54,9 +54,16 @@ def reset_store():
     """Reset the DataStore singleton and output session before each test."""
     DataStore.reset()
     reset_session()
+    from lmbagent.conclusions.store import ConclusionStore
+    ConclusionStore.reset()
+    import lmbagent.agent as _agent_mod
+    _agent_mod.store = DataStore()
+    _agent_mod.store._conn.execute("DELETE FROM conclusions")
+    _agent_mod.store._conn.commit()
     yield
     DataStore.reset()
     reset_session()
+    ConclusionStore.reset()
 
 
 @pytest.fixture

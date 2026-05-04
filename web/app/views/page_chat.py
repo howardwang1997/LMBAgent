@@ -1,126 +1,160 @@
-"""Chat page: AI-powered battery data analysis assistant."""
+"""Chat page: AI-powered data analysis conversation. Direct core library."""
 
 from __future__ import annotations
 
+import asyncio
+import sys
+from pathlib import Path
+
+_project_root = str(Path(__file__).parent.parent.parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 import streamlit as st
-from web.app.utils.api_client import chat_message, chat_stream_iter
+
+from lmbagent.data.store import DataStore
+from lmbagent.agent import TOOL_REGISTRY, HANDLER_MAP
+
+
+def _run_async(coro):
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+    if loop and loop.is_running():
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            return pool.submit(asyncio.run, coro).result()
+    else:
+        return asyncio.run(coro)
 
 
 def render_chat_page():
-    """Render the AI chat interface."""
-    st.header("🤖 AI 分析助手")
+    try:
+        _render()
+    except Exception as e:
+        import streamlit as st
+        st.error(f"页面渲染出错: {e}")
 
-    # Dataset selection
-    data_id = st.session_state.get("active_dataset_id")
 
-    col1, col2 = st.columns([3, 1])
+def _render():
+    store = DataStore()
 
-    with col1:
-        st.caption("与电池数据分析助手对话，支持自然语言查询")
+    st.header("AI 聊天")
 
-    with col2:
-        if data_id:
-            st.info(f"数据集: `{data_id}`")
-        else:
-            st.warning("未选择数据集")
+    st.markdown("""
+    与AI助手对话，使用自然语言分析电池数据。可用工具：
+    """)
 
-    st.divider()
+    with st.expander("可用工具列表"):
+        for t in TOOL_REGISTRY:
+            st.markdown(f"- **{t['name']}**: {t['description'][:80]}...")
 
-    # Chat history
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    if "chat_messages" not in st.session_state:
+        st.session_state.chat_messages = []
 
-    # Display chat history
-    for msg in st.session_state.messages:
+    for msg in st.session_state.chat_messages:
         with st.chat_message(msg["role"]):
-            if msg["role"] == "assistant":
-                # Show tool usage if any
-                if msg.get("tools_used"):
-                    st.caption(f"🔧 使用工具: {', '.join(msg['tools_used'])}")
             st.markdown(msg["content"])
 
-    # Suggested prompts
-    if not st.session_state.messages:
-        st.subheader("💡 试试这些问题")
+    st.markdown("**快速指令:**")
+    quick_prompts = [
+        "加载 data/examples/pec.csv 并分析",
+        "列出所有已加载的实验",
+        "对比所有实验的容量衰减",
+    ]
+    cols = st.columns(len(quick_prompts))
+    for col, prompt in zip(cols, quick_prompts):
+        if col.button(prompt, key=f"quick_{prompt}"):
+            st.session_state.chat_messages.append({"role": "user", "content": prompt})
+            _process_prompt(prompt, store)
+            st.rerun()
 
-        suggestions = [
-            "分析容量衰减趋势",
-            "库仑效率如何变化？",
-            "生成所有图表",
-            "这个电池的健康状况如何？",
-            "对比前 5 个循环的性能",
-        ]
+    if prompt := st.chat_input("输入分析指令..."):
+        st.session_state.chat_messages.append({"role": "user", "content": prompt})
+        _process_prompt(prompt, store)
+        st.rerun()
 
-        for suggestion in suggestions:
-            if st.button(suggestion, key=f"suggest_{suggestion}"):
-                st.session_state.prompt_input = suggestion
-                st.rerun()
 
-    # Chat input
-    if prompt := st.chat_input("输入您的问题...") or st.session_state.pop("prompt_input", None):
-        # Add user message
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+def _process_prompt(prompt: str, store: DataStore):
+    import re
 
-        # Get assistant response
-        with st.chat_message("assistant"):
-            with st.spinner("思考中..."):
-                try:
-                    # Use streaming for better UX
-                    response_placeholder = st.empty()
-                    full_response = ""
-                    tools_used = []
+    prompt_lower = prompt.lower()
+    tokens = prompt_lower.split()
 
-                    for chunk in chat_stream_iter(prompt, data_id):
-                        chunk_type = chunk.get("type")
+    try:
+        if "加载" in prompt_lower or "load" in prompt_lower:
+            file_path = None
+            for t in tokens:
+                if t.endswith(".csv") or t.endswith(".xlsx") or t.endswith(".npy"):
+                    file_path = t
+                    break
+            if not file_path:
+                m = re.search(r'[\w/.]+\.(csv|xlsx|npy)', prompt)
+                if m:
+                    file_path = m.group(0)
 
-                        if chunk_type == "content":
-                            content = chunk.get("content", "")
-                            full_response += content
-                            response_placeholder.markdown(full_response)
+            if file_path:
+                handler = HANDLER_MAP["load_battery_data"]
+                result = _run_async(handler({"file_path": file_path}))
+                response = result["content"][0]["text"]
+            else:
+                response = "请指定文件路径，例如: 加载 data/examples/pec.csv"
 
-                        elif chunk_type == "tool":
-                            tool_name = chunk.get("tool_name")
-                            tools_used.append(tool_name)
-                            st.caption(f"🔧 执行: {tool_name}")
+        elif "列出" in prompt_lower or "list" in prompt_lower:
+            ids = store.list_ids()
+            if ids:
+                table = store.list_as_table()
+                response = f"已加载 {len(ids)} 个数据集:\n\n"
+                for _, row in table.iterrows():
+                    response += f"- `{row.get('data_id', '')}` — {row.get('cell_id', '')} ({row.get('cycles', '')} cycles)\n"
+            else:
+                response = "暂无数据集。请先加载数据。"
 
-                        elif chunk_type == "error":
-                            response_placeholder.error(chunk.get("error", "Unknown error"))
-                            full_response = f"❌ 错误: {chunk.get('error', 'Unknown error')}"
+        elif "对比" in prompt_lower or "compare" in prompt_lower:
+            ids = store.list_ids()
+            if len(ids) < 2:
+                response = "至少需要2个数据集才能对比。"
+            else:
+                handler = HANDLER_MAP["compare_experiments"]
+                result = _run_async(handler({"data_ids": ",".join(ids)}))
+                response = result["content"][0]["text"]
 
-                        elif chunk_type == "done":
-                            break
+        elif "分析" in prompt_lower or "analyze" in prompt_lower:
+            active = st.session_state.get("active_dataset_id")
+            if not active:
+                ids = store.list_ids()
+                active = ids[0] if ids else None
+            if active:
+                handler = HANDLER_MAP["generate_report"]
+                result = _run_async(handler({"data_id": active}))
+                response = result["content"][0]["text"]
+            else:
+                response = "请先加载数据集。"
 
-                    # Add assistant message to history
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": full_response,
-                        "tools_used": tools_used,
-                    })
+        elif "退化" in prompt_lower or "degradation" in prompt_lower:
+            active = st.session_state.get("active_dataset_id")
+            if not active:
+                ids = store.list_ids()
+                active = ids[0] if ids else None
+            if active:
+                handler = HANDLER_MAP["analyze_failure_modes"]
+                result = _run_async(handler({"data_id": active}))
+                response = result["content"][0]["text"]
+            else:
+                response = "请先加载数据集。"
 
-                except Exception as e:
-                    error_msg = f"❌ 发生错误: {str(e)}"
-                    st.error(error_msg)
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": error_msg,
-                    })
+        else:
+            response = (
+                f"收到指令: \"{prompt}\"\n\n"
+                "我可以执行以下操作:\n"
+                "- 加载 <文件路径> — 加载数据\n"
+                "- 列出 — 列出所有数据集\n"
+                "- 对比 — 对比所有实验\n"
+                "- 分析 — 生成分析报告\n"
+                "- 退化 — 退化模式分解\n"
+            )
+    except Exception as e:
+        response = f"执行出错: {e}"
 
-    # Clear history button
-    if st.session_state.messages:
-        st.divider()
-        col1, col2, col3 = st.columns([1, 1, 4])
-        with col1:
-            if st.button("🗑️ 清空对话", use_container_width=True):
-                st.session_state.messages = []
-                st.rerun()
-        with col2:
-            if st.button("📥 导出对话", use_container_width=True):
-                import json
-                st.download_button(
-                    "下载 JSON",
-                    json.dumps(st.session_state.messages, ensure_ascii=False, indent=2),
-                    "chat_history.json",
-                    "application/json",
-                )
+    st.session_state.chat_messages.append({"role": "assistant", "content": response})

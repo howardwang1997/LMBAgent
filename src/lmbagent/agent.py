@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,16 @@ from lmbagent.visualization.efficiency_plot import plot_coulombic_efficiency
 from lmbagent.visualization.voltage_plot import plot_voltage_curves
 from lmbagent.visualization.impedance_plot import plot_impedance
 from lmbagent.report.generator import generate_report
+from lmbagent.comparison.overlay import overlay_capacity_fade, overlay_coulombic_efficiency, overlay_voltage_curves
+from lmbagent.comparison.delta import plot_delta_v
+from lmbagent.comparison.metrics import build_comparison_table, rank_by_metric, summarize_differences
+from lmbagent.degradation.decomposition import decompose_degradation_modes, plot_decomposition, format_decomposition_summary
+from lmbagent.degradation.doe_checker import check_doe_coverage, analyze_design_impact
+from lmbagent.data.catalog import scan_directory, batch_import
+from lmbagent.search.engine import SearchEngine
+from lmbagent.conclusions.models import Conclusion, ConclusionStatus
+from lmbagent.conclusions.store import ConclusionStore
+from lmbagent.conclusions.verifier import verify_conclusion, verify_all
 
 
 store = DataStore()
@@ -167,6 +178,351 @@ async def _handle_generate_report(args: dict[str, Any]) -> dict[str, Any]:
         return _error_result(str(e))
 
 
+async def _handle_list_experiments(args: dict[str, Any]) -> dict[str, Any]:
+    chemistry = args.get("chemistry")
+    cell_id = args.get("cell_id")
+    results = store.query(chemistry=chemistry, cell_id=cell_id)
+    if not results:
+        return _text_result(f"No experiments found. Total in store: {len(store.list_ids())}")
+    table = store.list_as_table()
+    cols_to_show = [c for c in ["data_id", "cell_id", "chemistry", "cycles", "source_file"] if c in table.columns]
+    return _text_result(f"Found {len(results)} experiments:\n{table[cols_to_show].to_string(index=False)}")
+
+
+async def _handle_compare_experiments(args: dict[str, Any]) -> dict[str, Any]:
+    data_ids = args.get("data_ids", "")
+    if isinstance(data_ids, str):
+        data_ids = [d.strip() for d in data_ids.split(",") if d.strip()]
+    datasets = []
+    for did in data_ids:
+        ds = store.get(did)
+        if ds is None:
+            return _error_result(f"Dataset '{did}' not found. Available: {store.list_ids()}")
+        if ds.cycle_summary.empty:
+            ds = add_cycle_summary(ds)
+            store.put(ds)
+        datasets.append(ds)
+    if len(datasets) < 2:
+        return _error_result("Need at least 2 datasets for comparison.")
+
+    table = build_comparison_table(datasets)
+    summary = summarize_differences(datasets)
+    text = f"Comparison of {len(datasets)} experiments:\n\n"
+    text += table.to_string(index=False)
+    text += f"\n\nDiffering design factors: {summary['differing_design_factors'] or 'None (identical designs)'}"
+    if summary["best_retention"]:
+        text += f"\nBest retention: {summary['best_retention']}"
+    if summary["worst_fade"]:
+        text += f"\nWorst fade: {summary['worst_fade']}"
+    return _text_result(text)
+
+
+async def _handle_overlay_plot(args: dict[str, Any]) -> dict[str, Any]:
+    data_ids = args.get("data_ids", "")
+    if isinstance(data_ids, str):
+        data_ids = [d.strip() for d in data_ids.split(",") if d.strip()]
+    plot_type = args.get("plot_type", "capacity")
+    datasets = []
+    for did in data_ids:
+        ds = store.get(did)
+        if ds is None:
+            return _error_result(f"Dataset '{did}' not found. Available: {store.list_ids()}")
+        if ds.cycle_summary.empty:
+            ds = add_cycle_summary(ds)
+            store.put(ds)
+        datasets.append(ds)
+    if len(datasets) < 2:
+        return _error_result("Need at least 2 datasets for overlay plot.")
+
+    output_dir = get_output_dir("comparison")
+    try:
+        if plot_type == "ce":
+            path = overlay_coulombic_efficiency(datasets, output_path=output_dir / "overlay_ce.png")
+        elif plot_type == "voltage":
+            cycle_num = int(args.get("cycle", 0))
+            path = overlay_voltage_curves(datasets, cycle_number=cycle_num,
+                                          output_path=output_dir / f"overlay_voltage_c{cycle_num}.png")
+        else:
+            normalize = args.get("normalize", False)
+            path = overlay_capacity_fade(datasets, normalize=normalize,
+                                         output_path=output_dir / "overlay_capacity.png")
+        return _text_result(f"Overlay plot saved to: {path}")
+    except Exception as e:
+        return _error_result(str(e))
+
+
+async def _handle_delta_analysis(args: dict[str, Any]) -> dict[str, Any]:
+    data_id_a = args.get("data_id_a", "")
+    data_id_b = args.get("data_id_b", "")
+    ds_a = store.get(data_id_a)
+    ds_b = store.get(data_id_b)
+    if ds_a is None or ds_b is None:
+        return _error_result(f"Dataset not found. Available: {store.list_ids()}")
+    if ds_a.cycle_summary.empty:
+        ds_a = add_cycle_summary(ds_a)
+        store.put(ds_a)
+    if ds_b.cycle_summary.empty:
+        ds_b = add_cycle_summary(ds_b)
+        store.put(ds_b)
+
+    cycle_num = int(args.get("cycle", 0))
+    output_dir = get_output_dir("comparison")
+    try:
+        path = plot_delta_v(ds_a, ds_b, cycle_number=cycle_num,
+                            output_path=output_dir / f"delta_v_{data_id_a}_{data_id_b}_c{cycle_num}.png")
+        return _text_result(f"Delta analysis plot saved to: {path}")
+    except Exception as e:
+        return _error_result(str(e))
+
+
+async def _handle_analyze_failure_modes(args: dict[str, Any]) -> dict[str, Any]:
+    data_id = args.get("data_id", "")
+    ds = store.get(data_id)
+    if ds is None:
+        return _error_result(f"Dataset not found. Available: {store.list_ids()}")
+    if ds.cycle_summary.empty:
+        ds = add_cycle_summary(ds)
+        store.put(ds)
+    try:
+        result = decompose_degradation_modes(ds)
+        if "error" in result:
+            return _error_result(result["error"])
+        output_dir = get_output_dir(data_id)
+        path = plot_decomposition(result, output_path=output_dir / "decomposition.png")
+        summary = format_decomposition_summary(result)
+        return _text_result(f"{summary}\n\nDecomposition plot saved to: {path}")
+    except Exception as e:
+        return _error_result(str(e))
+
+
+async def _handle_analyze_design_impact(args: dict[str, Any]) -> dict[str, Any]:
+    data_ids = args.get("data_ids", "")
+    focus_factor = args.get("focus_factor")
+    if isinstance(data_ids, str):
+        data_ids = [d.strip() for d in data_ids.split(",") if d.strip()]
+    datasets = []
+    for did in data_ids:
+        ds = store.get(did)
+        if ds is None:
+            return _error_result(f"Dataset '{did}' not found. Available: {store.list_ids()}")
+        datasets.append(ds)
+    if len(datasets) < 2:
+        return _error_result("Need at least 2 experiments for design impact analysis.")
+    try:
+        result = analyze_design_impact(datasets, focus_factor=focus_factor)
+        lines = [f"Design Impact Analysis ({result['n_experiments']} experiments)"]
+        lines.append(f"Factors analyzed: {result['factors_analyzed']}")
+        for factor, info in result.get("factor_analysis", {}).items():
+            lines.append(f"\n  {factor}:")
+            if "correlation_with_fade" in info:
+                lines.append(f"    Correlation with fade: r={info['correlation_with_fade']}")
+            if "interpretation" in info:
+                lines.append(f"    {info['interpretation']}")
+            if "groups" in info:
+                for val, stats in info["groups"].items():
+                    lines.append(f"    {val}: mean fade={stats['mean_fade']}% (n={stats['n']})")
+        return _text_result("\n".join(lines))
+    except Exception as e:
+        return _error_result(str(e))
+
+
+async def _handle_check_doe_coverage(args: dict[str, Any]) -> dict[str, Any]:
+    data_ids = args.get("data_ids", "")
+    if isinstance(data_ids, str):
+        data_ids = [d.strip() for d in data_ids.split(",") if d.strip()]
+    datasets = []
+    for did in data_ids:
+        ds = store.get(did)
+        if ds is None:
+            return _error_result(f"Dataset '{did}' not found. Available: {store.list_ids()}")
+        datasets.append(ds)
+    if len(datasets) < 2:
+        return _error_result("Need at least 2 experiments for DOE coverage analysis.")
+    try:
+        result = check_doe_coverage(datasets)
+        lines = [f"DOE Coverage Analysis ({result['n_experiments']} experiments)"]
+        lines.append(f"Coverage score: {result['coverage_score']:.1%}")
+        lines.append(f"Factors tested (varying): {result['factors_tested']}")
+        lines.append(f"Factors constant/missing: {result['factors_constant']}")
+        if result['missing_combinations']:
+            lines.append(f"\nMissing combinations ({len(result['missing_combinations'])} total, showing first 5):")
+            for combo in result['missing_combinations'][:5]:
+                lines.append(f"  {combo}")
+        if result['recommendations']:
+            lines.append("\nRecommendations:")
+            for rec in result['recommendations']:
+                lines.append(f"  [{rec['priority']}] {rec['description']}")
+        return _text_result("\n".join(lines))
+    except Exception as e:
+        return _error_result(str(e))
+
+
+async def _handle_recommend_experiments(args: dict[str, Any]) -> dict[str, Any]:
+    data_ids = args.get("data_ids", "")
+    if isinstance(data_ids, str):
+        data_ids = [d.strip() for d in data_ids.split(",") if d.strip()]
+    if not data_ids:
+        data_ids = store.list_ids()
+    datasets = []
+    for did in data_ids:
+        ds = store.get(did)
+        if ds is not None:
+            datasets.append(ds)
+    if len(datasets) < 2:
+        return _error_result("Need at least 2 experiments to generate recommendations.")
+    try:
+        doe = check_doe_coverage(datasets)
+        lines = [f"Experiment Recommendations (based on {len(datasets)} existing experiments)"]
+        lines.append(f"Current DOE coverage: {doe['coverage_score']:.1%}\n")
+        if doe['recommendations']:
+            for i, rec in enumerate(doe['recommendations'], 1):
+                lines.append(f"{i}. [{rec['priority'].upper()}] {rec['description']}")
+        else:
+            lines.append("DOE appears well-covered. No critical gaps found.")
+        lines.append(f"\nFactors currently tested: {doe['factors_tested']}")
+        lines.append(f"Factors not yet varied: {doe['factors_constant']}")
+        return _text_result("\n".join(lines))
+    except Exception as e:
+        return _error_result(str(e))
+
+
+async def _handle_scan_and_import(args: dict[str, Any]) -> dict[str, Any]:
+    directory = args.get("directory", "")
+    dry_run = args.get("dry_run", False)
+    if not directory:
+        return _error_result("directory is required")
+    from pathlib import Path as _P
+    if not _P(directory).is_dir():
+        return _error_result(f"Not a directory: {directory}")
+    try:
+        candidates = scan_directory(directory)
+        if not candidates:
+            return _text_result(f"No data files found in {directory}")
+        lines = [f"Found {len(candidates)} data files in {directory}:"]
+        for c in candidates:
+            design_tag = " [+design]" if c.design_path else ""
+            lines.append(f"  {c.path.name} ({c.format}){design_tag}")
+        if dry_run:
+            return _text_result("\n".join(lines))
+        imported = batch_import(candidates, store=store)
+        n_ok = sum(1 for c in imported if c.imported)
+        n_fail = sum(1 for c in imported if not c.imported and c.error)
+        lines.append(f"\nImport: {n_ok} succeeded, {n_fail} failed")
+        if n_ok > 0:
+            lines.append(f"Total experiments in database: {len(store.list_ids())}")
+        return _text_result("\n".join(lines))
+    except Exception as e:
+        return _error_result(str(e))
+
+
+# --- Week 4: Search & Conclusion Handlers ---
+
+async def _handle_search_similar(args: dict[str, Any]) -> dict[str, Any]:
+    data_id = args.get("data_id")
+    if not data_id:
+        return _error_result("data_id is required")
+    mode = args.get("mode", "similar")
+    top_k = int(args.get("top_k", 5))
+    try:
+        engine = SearchEngine(store)
+        ds = store.get(data_id)
+        if ds is None:
+            return _error_result(f"Dataset '{data_id}' not found")
+        results = engine.search_similar(data_id, mode=mode, top_k=top_k)
+        if not results:
+            return _text_result("No similar/contrast experiments found.")
+        lines = [f"Search results (mode={mode}, top {len(results)}):"]
+        lines.append("")
+        for i, r in enumerate(results, 1):
+            lines.append(f"{i}. {r.data_id} — score: {r.score:.3f}")
+            lines.append(f"   {r.reason}")
+        return _text_result("\n".join(lines))
+    except Exception as e:
+        return _error_result(str(e))
+
+
+async def _handle_manage_conclusion(args: dict[str, Any]) -> dict[str, Any]:
+    action = args.get("action", "list")
+    cs = ConclusionStore(store)
+    try:
+        if action == "list":
+            conclusions = cs.list_all()
+            if not conclusions:
+                return _text_result("No conclusions found.")
+            lines = [f"Conclusions ({len(conclusions)}):"]
+            for c in conclusions:
+                status_icon = {"active": "🟢", "supported": "✅", "challenged": "🔴",
+                               "superseded": "⏭️", "retracted": "❌"}.get(c.status.value, "?")
+                lines.append(f"\n{status_icon} [{c.conclusion_id}] ({c.status.value}, {c.confidence})")
+                lines.append(f"   {c.statement}")
+                if c.scope:
+                    lines.append(f"   Scope: {c.scope}")
+                if c.evidence_ids:
+                    lines.append(f"   Evidence: {', '.join(c.evidence_ids)}")
+            return _text_result("\n".join(lines))
+
+        elif action == "add":
+            cid = args.get("conclusion_id", f"C-{datetime.now().strftime('%Y%m%d-%H%M%S')}")
+            conclusion = Conclusion(
+                conclusion_id=cid,
+                statement=args.get("statement", ""),
+                scope=args.get("scope", ""),
+                evidence_ids=args.get("evidence_ids", "").split(",") if args.get("evidence_ids") else [],
+                confidence=args.get("confidence", "medium"),
+            )
+            cs.add(conclusion)
+            return _text_result(f"Conclusion added: {cid}")
+
+        elif action == "update":
+            cid = args.get("conclusion_id")
+            if not cid:
+                return _error_result("conclusion_id required for update")
+            updated = cs.update(
+                cid,
+                statement=args.get("statement"),
+                status=args.get("status"),
+                confidence=args.get("confidence"),
+                evidence_ids=args.get("evidence_ids", "").split(",") if args.get("evidence_ids") else None,
+            )
+            if updated is None:
+                return _error_result(f"Conclusion '{cid}' not found")
+            return _text_result(f"Conclusion updated: {cid} → {updated.status.value}")
+
+        elif action == "delete":
+            cid = args.get("conclusion_id")
+            if not cid:
+                return _error_result("conclusion_id required for delete")
+            if cs.remove(cid):
+                return _text_result(f"Conclusion deleted: {cid}")
+            return _error_result(f"Conclusion '{cid}' not found")
+
+        else:
+            return _error_result(f"Unknown action: {action}. Use list/add/update/delete.")
+    except Exception as e:
+        return _error_result(str(e))
+
+
+async def _handle_verify_with_new_data(args: dict[str, Any]) -> dict[str, Any]:
+    data_id = args.get("data_id")
+    if not data_id:
+        return _error_result("data_id is required")
+    try:
+        results = verify_all(data_id, store=store)
+        if not results:
+            return _text_result("No active conclusions to verify.")
+        lines = [f"Verification against '{data_id}' ({len(results)} conclusions):"]
+        for r in results:
+            icon = {"supported": "✅", "challenged": "🔴", "inconclusive": "❓"}.get(r.verdict, "?")
+            lines.append(f"\n{icon} {r.conclusion_id}: {r.verdict.upper()}")
+            lines.append(f"   {r.evidence_summary}")
+            if r.details:
+                lines.append(f"   Details: {r.details}")
+            lines.append(f"   Confidence: {r.confidence_change}")
+        return _text_result("\n".join(lines))
+    except Exception as e:
+        return _error_result(str(e))
+
+
 # --- Unified Tool Registry (backend-agnostic) ---
 
 TOOL_REGISTRY = [
@@ -257,6 +613,206 @@ TOOL_REGISTRY = [
             "required": ["data_id"],
         },
         "handler": _handle_generate_report,
+    },
+    {
+        "name": "list_experiments",
+        "description": (
+            "List all loaded experiments, optionally filtered by chemistry or cell_id. "
+            "Returns a table with data_id, cell_id, chemistry, cycles."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chemistry": {"type": "string", "description": "Optional chemistry filter, e.g. 'NMC811'"},
+                "cell_id": {"type": "string", "description": "Optional cell ID filter"},
+            },
+        },
+        "handler": _handle_list_experiments,
+    },
+    {
+        "name": "compare_experiments",
+        "description": (
+            "Compare multiple experiments side by side. Returns a metrics table with "
+            "capacity, CE, fade, retention, and design factors. Also identifies differing "
+            "design factors and best/worst performers."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "data_ids": {"type": "string", "description": "Comma-separated dataset IDs, e.g. 'abc123,def456'"},
+            },
+            "required": ["data_ids"],
+        },
+        "handler": _handle_compare_experiments,
+    },
+    {
+        "name": "overlay_plot",
+        "description": (
+            "Generate overlay comparison plots for multiple experiments. "
+            "Supports capacity fade, coulombic efficiency, and voltage curve overlays."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "data_ids": {"type": "string", "description": "Comma-separated dataset IDs"},
+                "plot_type": {"type": "string", "description": "'capacity' (default), 'ce', or 'voltage'"},
+                "normalize": {"type": "boolean", "description": "Normalize capacity (default: false)"},
+                "cycle": {"type": "integer", "description": "Cycle number for voltage overlay (default: 0)"},
+            },
+            "required": ["data_ids"],
+        },
+        "handler": _handle_overlay_plot,
+    },
+    {
+        "name": "delta_analysis",
+        "description": (
+            "Compute voltage difference (ΔV) between two experiments at a given cycle. "
+            "Generates a two-panel plot: discharge curves + ΔV(mV)."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "data_id_a": {"type": "string", "description": "First dataset ID"},
+                "data_id_b": {"type": "string", "description": "Second dataset ID"},
+                "cycle": {"type": "integer", "description": "Cycle number (default: 0)"},
+            },
+            "required": ["data_id_a", "data_id_b"],
+        },
+        "handler": _handle_delta_analysis,
+    },
+    {
+        "name": "analyze_failure_modes",
+        "description": (
+            "Decompose degradation modes for a single experiment. Fits voltage change "
+            "as a combination of 7 degradation signatures (SEI growth, Li plating, "
+            "LAM_pos, LAM_neg, resistance growth, diffusion degradation, electrolyte depletion)."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "data_id": {"type": "string", "description": "Dataset ID"},
+            },
+            "required": ["data_id"],
+        },
+        "handler": _handle_analyze_failure_modes,
+    },
+    {
+        "name": "analyze_design_impact",
+        "description": (
+            "Analyze how design factors correlate with degradation outcomes across "
+            "multiple experiments. Identifies which design factors significantly affect "
+            "capacity fade and dominant degradation mode."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "data_ids": {"type": "string", "description": "Comma-separated dataset IDs"},
+                "focus_factor": {"type": "string", "description": "Optional specific factor to focus on"},
+            },
+            "required": ["data_ids"],
+        },
+        "handler": _handle_analyze_design_impact,
+    },
+    {
+        "name": "check_doe_coverage",
+        "description": (
+            "Check DOE completeness: which design factors have been varied, which are "
+            "missing, what combinations are untested. Returns coverage score and missing combos."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "data_ids": {"type": "string", "description": "Comma-separated dataset IDs"},
+            },
+            "required": ["data_ids"],
+        },
+        "handler": _handle_check_doe_coverage,
+    },
+    {
+        "name": "recommend_experiments",
+        "description": (
+            "Recommend supplementary experiments to fill DOE gaps. Analyzes current "
+            "experimental coverage and suggests missing combinations, midpoints, and "
+            "new factors to test."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "data_ids": {"type": "string", "description": "Comma-separated dataset IDs (empty = use all)"},
+            },
+        },
+        "handler": _handle_recommend_experiments,
+    },
+    {
+        "name": "scan_and_import",
+        "description": (
+            "Scan a directory for battery experiment data files and batch import them. "
+            "Automatically detects formats (PEC, Neware, Arbin, generic CSV), matches "
+            "design metadata YAML files, and computes cycle summaries."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "directory": {"type": "string", "description": "Directory path to scan"},
+                "dry_run": {"type": "boolean", "description": "If true, only list files without importing (default: false)"},
+            },
+            "required": ["directory"],
+        },
+        "handler": _handle_scan_and_import,
+    },
+    {
+        "name": "search_similar",
+        "description": (
+            "Search for similar or contrastive historical experiments. "
+            "'similar' mode finds datasets with high cosine similarity in combined feature vectors. "
+            "'contrast' mode finds datasets with similar design but different degradation patterns."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "data_id": {"type": "string", "description": "Query dataset ID"},
+                "mode": {"type": "string", "description": "'similar' (default) or 'contrast'"},
+                "top_k": {"type": "integer", "description": "Number of results (default: 5)"},
+            },
+            "required": ["data_id"],
+        },
+        "handler": _handle_search_similar,
+    },
+    {
+        "name": "manage_conclusion",
+        "description": (
+            "Manage experimental conclusions: add, list, update status, or delete. "
+            "Conclusions can be linked to evidence datasets and tracked for verification."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "description": "'list' (default), 'add', 'update', or 'delete'"},
+                "conclusion_id": {"type": "string", "description": "Conclusion ID (required for update/delete)"},
+                "statement": {"type": "string", "description": "Conclusion statement text (for add/update)"},
+                "scope": {"type": "string", "description": "Scope description (e.g., 'NMC811|2C|25C')"},
+                "evidence_ids": {"type": "string", "description": "Comma-separated evidence dataset IDs"},
+                "confidence": {"type": "string", "description": "low, medium, high"},
+                "status": {"type": "string", "description": "active, supported, challenged, superseded, retracted"},
+            },
+        },
+        "handler": _handle_manage_conclusion,
+    },
+    {
+        "name": "verify_with_new_data",
+        "description": (
+            "Verify all active conclusions against new experimental data. Checks whether "
+            "new data supports, challenges, or is inconclusive for each conclusion based on "
+            "performance metrics, degradation patterns, and similarity to evidence."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "data_id": {"type": "string", "description": "New dataset ID to verify against"},
+            },
+            "required": ["data_id"],
+        },
+        "handler": _handle_verify_with_new_data,
     },
 ]
 

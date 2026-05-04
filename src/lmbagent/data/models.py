@@ -8,6 +8,8 @@ from typing import Any, Optional
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 
+from lmbagent.data.schema import ExperimentDesign
+
 
 class BatteryDataset(BaseModel):
     """Container for a loaded battery dataset."""
@@ -22,6 +24,7 @@ class BatteryDataset(BaseModel):
     raw_data: pd.DataFrame = Field(default_factory=pd.DataFrame)
     cycle_summary: pd.DataFrame = Field(default_factory=pd.DataFrame)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    experiment_design: Optional[ExperimentDesign] = None
 
     @property
     def num_cycles(self) -> int:
@@ -34,6 +37,12 @@ class BatteryDataset(BaseModel):
     @property
     def num_data_points(self) -> int:
         return len(self.raw_data)
+
+    @property
+    def chemistry(self) -> str | None:
+        if self.experiment_design:
+            return self.experiment_design.chemistry
+        return self.metadata.get("chemistry")
 
 
 # Standard column names for raw data (after normalization)

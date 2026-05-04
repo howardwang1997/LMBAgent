@@ -11,14 +11,19 @@ from lmbagent.agent import (
     _handle_plot_coulombic_efficiency,
     _handle_plot_voltage_curves,
     _handle_generate_report,
-    store,
 )
+import lmbagent.agent as _agent_mod
 from lmbagent.data.loader import load_pec_csv
 from lmbagent.data.transformer import add_cycle_summary
 
 
+def _get_store():
+    return _agent_mod.store
+
+
 @pytest.fixture
 def loaded_data_id(pec_csv_path):
+    store = _get_store()
     ds = load_pec_csv(pec_csv_path, data_id="test_pec")
     ds = add_cycle_summary(ds)
     store.put(ds)
