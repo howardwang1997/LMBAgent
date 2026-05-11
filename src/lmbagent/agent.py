@@ -386,6 +386,70 @@ async def _handle_recommend_experiments(args: dict[str, Any]) -> dict[str, Any]:
         return _error_result(str(e))
 
 
+async def _handle_template_doe(args: dict[str, Any]) -> dict[str, Any]:
+    template_path = args.get("template_path", "")
+    data_dir = args.get("data_dir", "")
+    if not template_path:
+        return _error_result("template_path is required (path to 电芯挂测表 xlsx)")
+    from pathlib import Path as _P
+    if not _P(template_path).exists():
+        return _error_result(f"Template file not found: {template_path}")
+    try:
+        from lmbagent.data.cell_test_template import (
+            load_cell_test_template, match_cycling_data_to_template,
+            load_template_reference_sheets,
+        )
+        records = load_cell_test_template(template_path)
+        if not records:
+            return _error_result("No valid records found in template (empty 挂测表 sheet)")
+        lines = [f"电芯挂测表: {len(records)} 条记录"]
+        for r in records:
+            lines.append(f"  {r.cell_id}: {r.cathode}/{r.anode}/{r.electrolyte}/{r.separator} "
+                         f"T={r.test_temperature_c}C ch={r.charge_rate_c}C dis={r.discharge_rate_c}C")
+        if data_dir and _P(data_dir).is_dir():
+            matches = match_cycling_data_to_template(records, data_dir)
+            lines.append(f"\n数据匹配: {len(matches)}/{sum(1 for _ in _P(data_dir).rglob('*.xlsx'))} xlsx 文件")
+            for fp, rec in list(matches.items())[:10]:
+                lines.append(f"  {_P(fp).name} → {rec.cell_id}")
+        refs = load_template_reference_sheets(template_path)
+        if refs:
+            lines.append("\n参考值:")
+            for key, vals in refs.items():
+                lines.append(f"  {key}: {vals[:5]}...")
+        if data_dir and _P(data_dir).is_dir():
+            from lmbagent.data.cell_test_template import CellTestRecord
+            from lmbagent.degradation.doe_checker import check_doe_from_template
+            from lmbagent.data.loader import load_auto
+            matched_records = match_cycling_data_to_template(records, data_dir)
+            if matched_records:
+                datasets = []
+                for fp_str, rec in matched_records.items():
+                    try:
+                        ds = load_auto(fp_str, data_id=rec.cell_id)
+                        ds.cell_id = rec.cell_id
+                        ds = add_cycle_summary(ds)
+                        datasets.append(ds)
+                    except Exception:
+                        pass
+                if datasets:
+                    doe = check_doe_from_template(records, datasets)
+                    lines.append(f"\nDOE 分析 (模板模式, {doe['n_experiments']} 实验):")
+                    lines.append(f"  覆盖度: {doe['coverage_score']:.1%}")
+                    lines.append(f"  已变化因子: {doe['factors_tested']}")
+                    lines.append(f"  固定/缺失因子: {doe['factors_constant']}")
+                    if doe['missing_combinations']:
+                        lines.append(f"  缺失组合 (共{len(doe['missing_combinations'])}个, 前5个):")
+                        for combo in doe['missing_combinations'][:5]:
+                            lines.append(f"    {combo}")
+                    if doe['recommendations']:
+                        lines.append("  推荐:")
+                        for rec_item in doe['recommendations']:
+                            lines.append(f"    [{rec_item['priority']}] {rec_item['description']}")
+        return _text_result("\n".join(lines))
+    except Exception as e:
+        return _error_result(str(e))
+
+
 async def _handle_scan_and_import(args: dict[str, Any]) -> dict[str, Any]:
     directory = args.get("directory", "")
     dry_run = args.get("dry_run", False)
@@ -742,6 +806,25 @@ TOOL_REGISTRY = [
             },
         },
         "handler": _handle_recommend_experiments,
+    },
+    {
+        "name": "template_doe_analysis",
+        "description": (
+            "Parse a 电芯挂测表 (cell test template xlsx) and perform DOE analysis "
+            "using real design factors: 电解液, 隔膜, 测试温度, 充放电电流, 电压窗口, "
+            "阴极, 阳极, 注液系数, 夹具, 预紧力, 缓冲垫 etc. "
+            "If data_dir is provided, matches cycling data files to template records "
+            "by cell ID and runs full DOE coverage analysis."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "template_path": {"type": "string", "description": "Path to 电芯挂测表 template xlsx"},
+                "data_dir": {"type": "string", "description": "Optional directory with cycling data xlsx files to match and analyze"},
+            },
+            "required": ["template_path"],
+        },
+        "handler": _handle_template_doe,
     },
     {
         "name": "scan_and_import",
