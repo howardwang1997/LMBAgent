@@ -59,8 +59,7 @@ def _render():
                     tmp_path = Path(tmpdir) / uploaded.name
                     tmp_path.write_bytes(uploaded.getvalue())
                     loaded = False
-                    
-                    # Try standard loading first
+
                     try:
                         ds = load_auto(str(tmp_path), data_id=data_id or None)
                         if ds.num_data_points > 0:
@@ -75,8 +74,7 @@ def _render():
                             st.warning("标准加载成功但数据为空，尝试 AI 智能加载...")
                     except Exception as e:
                         st.warning(f"标准加载失败: {e}，尝试 AI 智能加载...")
-                    
-                    # Fallback to LLM smart loading
+
                     if not loaded:
                         try:
                             from lmbagent.data.llm_loader import llm_smart_load
@@ -230,12 +228,14 @@ def _render():
                             except Exception as e2:
                                 st.error(f"加载失败: {e2}")
 
-    # --- Tab 5: LLM smart loading ---
+    # --- Tab 5: AI smart loading + interactive correction ---
     with tab_llm:
-        st.subheader("AI 智能加载")
+        st.subheader("AI 智能加载与校对")
         st.markdown("""
-        上传数据文件，AI 会自动分析文件结构，识别数据格式和列含义，智能选择最佳加载方式。
-        适用于非标准格式、混合编码、不确定列映射等场景。
+        上传数据文件，AI 自动分析文件结构并加载。加载后可查看数据片段，
+        如果有问题可直接用自然语言对话校正。
+
+        **校正示例:** "第一列是循环号，第三列是电压" / "跳过前5行" / "容量需按电流正负拆分"
         """)
 
         llm_file = st.file_uploader(
@@ -250,54 +250,208 @@ def _render():
                                         placeholder=llm_file.name.split(".")[0],
                                         key="llm_data_id")
 
+            # Persistent temp file (survives Streamlit reruns)
+            llm_tmp_dir = Path(tempfile.gettempdir()) / "lmbagent_llm"
+            llm_tmp_dir.mkdir(parents=True, exist_ok=True)
+            llm_tmp_path = llm_tmp_dir / llm_file.name
+            llm_tmp_path.write_bytes(llm_file.getvalue())
+
+            # Session state init
+            if "llm_messages" not in st.session_state:
+                st.session_state.llm_messages = []
+            if "llm_analysis" not in st.session_state:
+                st.session_state.llm_analysis = None
+            if "llm_dataset" not in st.session_state:
+                st.session_state.llm_dataset = None
+            if "llm_file_key" not in st.session_state:
+                st.session_state.llm_file_key = None
+
+            # Reset if file changed
+            if st.session_state.llm_file_key != llm_file.name:
+                st.session_state.llm_messages = []
+                st.session_state.llm_analysis = None
+                st.session_state.llm_dataset = None
+                st.session_state.llm_file_key = llm_file.name
+
+            # --- Step 1: AI analyze + load ---
             if st.button("AI 分析并加载", type="primary", key="llm_load_btn"):
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    tmp_path = Path(tmpdir) / llm_file.name
-                    tmp_path.write_bytes(llm_file.getvalue())
+                with st.spinner("AI 正在分析文件结构并加载..."):
+                    from lmbagent.data.llm_loader import llm_analyze_file, llm_smart_load
 
-                    with st.spinner("AI 正在分析文件结构..."):
-                        from lmbagent.data.llm_loader import llm_analyze_file, llm_smart_load
-                        analysis = llm_analyze_file(str(tmp_path))
+                    analysis = llm_analyze_file(str(llm_tmp_path))
 
-                    if analysis.get("llm_used"):
-                        st.success("AI 分析完成")
-                    else:
-                        st.warning("AI 分析未成功，使用默认方式")
+                    analysis_lines = []
+                    analysis_lines.append(f"**识别格式:** `{analysis.get('format', 'unknown')}`")
+                    analysis_lines.append(f"**分隔符:** `{analysis.get('separator', ',')}`")
+                    analysis_lines.append(f"**跳过行数:** {analysis.get('skip_rows', 0)}")
+                    analysis_lines.append(f"**编码:** {analysis.get('encoding', 'utf-8')}")
 
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown(f"**识别格式:** `{analysis.get('format', 'unknown')}`")
-                        st.markdown(f"**分隔符:** `{analysis.get('separator', ',')}`")
-                        st.markdown(f"**跳过行数:** {analysis.get('skip_rows', 0)}")
-                        st.markdown(f"**编码:** {analysis.get('encoding', 'utf-8')}")
-                    with col2:
-                        if analysis.get("column_map"):
-                            st.markdown("**列映射:**")
-                            for std, actual in analysis["column_map"].items():
-                                if actual:
-                                    st.markdown(f"  `{std}` ← `{actual}`")
+                    if analysis.get("column_map"):
+                        analysis_lines.append("**列映射:**")
+                        for std, actual in analysis["column_map"].items():
+                            if actual:
+                                analysis_lines.append(f"  `{std}` ← `{actual}`")
 
                     if analysis.get("reasoning"):
-                        with st.expander("AI 分析说明"):
-                            st.markdown(analysis["reasoning"])
+                        analysis_lines.append(f"\n*AI说明: {analysis['reasoning']}*")
 
-                    with st.spinner("正在加载数据..."):
-                        try:
-                            ds = llm_smart_load(str(tmp_path), data_id=llm_data_id or None)
-                            ds = add_cycle_summary(ds)
-                            store.put(ds)
-                            st.session_state.active_dataset_id = ds.data_id
-                            st.success(
-                                f"加载成功! ID: `{ds.data_id}`, "
-                                f"{ds.num_data_points} points, {ds.num_cycles} cycles"
-                            )
-                        except Exception as e:
-                            st.error(f"加载失败: {e}")
-                            st.info("可以尝试在\"上传文件\"标签页手动指定格式。")
+                    st.session_state.llm_analysis = analysis
+
+                    try:
+                        ds = llm_smart_load(str(llm_tmp_path), data_id=llm_data_id or None)
+                        if ds and ds.num_data_points > 0:
+                            st.session_state.llm_dataset = ds
+                            col_info = ", ".join(ds.raw_data.columns.tolist())
+                            st.session_state.llm_messages.append({
+                                "role": "assistant",
+                                "content": (
+                                    f"AI 加载完成!\n\n"
+                                    + "\n".join(analysis_lines) + "\n\n"
+                                    f"**数据:** {ds.num_data_points} 行, {ds.num_cycles} 循环\n"
+                                    f"**列:** {col_info}\n\n"
+                                    f"请检查下方数据预览，如有问题请直接输入校正指令。"
+                                ),
+                            })
+                        else:
+                            st.session_state.llm_messages.append({
+                                "role": "assistant",
+                                "content": (
+                                    "AI 分析完成但加载结果为空。\n\n"
+                                    + "\n".join(analysis_lines) + "\n\n"
+                                    "请在下方描述文件格式，我会帮你校正加载。"
+                                ),
+                            })
+                    except Exception as e:
+                        st.session_state.llm_messages.append({
+                            "role": "assistant",
+                            "content": (
+                                f"AI 加载失败: {e}\n\n"
+                                + "\n".join(analysis_lines) + "\n\n"
+                                "请在下方描述文件格式，我会帮你校正加载。"
+                            ),
+                        })
+
+            # --- File preview ---
+            with st.expander("原始文件预览", expanded=False):
+                _show_file_preview(llm_tmp_path)
+
+            # --- Data preview (live) ---
+            if st.session_state.llm_dataset is not None:
+                ds_preview = st.session_state.llm_dataset
+                with st.expander("数据预览", expanded=True):
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("数据行数", f"{ds_preview.num_data_points:,}")
+                    c2.metric("循环数", ds_preview.num_cycles)
+                    c3.metric("列数", len(ds_preview.raw_data.columns))
+                    st.markdown(f"**列名:** `{list(ds_preview.raw_data.columns)}`")
+                    st.dataframe(
+                        ds_preview.raw_data.head(20),
+                        hide_index=True,
+                        use_container_width=True,
+                    )
+                    if ds_preview.num_cycles > 0 and "discharge_capacity" in ds_preview.raw_data.columns:
+                        cyc = ds_preview.raw_data.groupby("cycle_index")["discharge_capacity"].max()
+                        st.markdown(f"**放电容量范围:** {cyc.min():.4f} ~ {cyc.max():.4f} Ah")
+
+            # --- Chat history ---
+            for msg in st.session_state.llm_messages:
+                with st.chat_message(msg["role"]):
+                    st.markdown(msg["content"])
+
+            # --- Chat input for correction ---
+            if user_input := st.chat_input("输入校正指令，如: 第一列是循环号，容量需按电流正负拆分..."):
+                st.session_state.llm_messages.append({"role": "user", "content": user_input})
+
+                with st.spinner("AI 正在根据你的反馈重新加载..."):
+                    from lmbagent.data.llm_loader import corrective_load
+
+                    ds, analysis = corrective_load(
+                        str(llm_tmp_path),
+                        user_feedback=user_input,
+                        previous_analysis=st.session_state.llm_analysis,
+                        data_id=llm_data_id or None,
+                    )
+
+                st.session_state.llm_analysis = analysis
+
+                if ds is not None and ds.num_data_points > 0:
+                    st.session_state.llm_dataset = ds
+                    col_info = ", ".join(ds.raw_data.columns.tolist())
+                    reply = (
+                        f"校正加载成功!\n\n"
+                        f"- 识别格式: `{analysis.get('format', 'unknown')}`\n"
+                        f"- 数据: {ds.num_data_points} 行, {ds.num_cycles} 循环\n"
+                        f"- 列: {col_info}\n"
+                    )
+                    if analysis.get("reasoning"):
+                        reply += f"- AI说明: {analysis['reasoning']}\n"
+                    reply += "\n请检查数据预览，如需进一步调整请继续输入。"
+                    st.session_state.llm_messages.append({"role": "assistant", "content": reply})
+                else:
+                    reason = analysis.get("reasoning", "未知原因")
+                    st.session_state.llm_messages.append({
+                        "role": "assistant",
+                        "content": (
+                            f"校正后仍未成功加载: {reason}\n\n"
+                            "请提供更多格式信息，例如:\n"
+                            "- 列名含义\n- 分隔符类型\n- 需要跳过的行数"
+                        ),
+                    })
+
+                st.rerun()
+
+            # --- Confirm and save ---
+            if st.session_state.llm_dataset is not None:
+                st.divider()
+                if st.button("确认入库", type="primary", key="llm_save_btn"):
+                    ds = st.session_state.llm_dataset
+                    ds = add_cycle_summary(ds)
+                    store.put(ds)
+                    st.session_state.active_dataset_id = ds.data_id
+                    st.success(
+                        f"已入库! ID: `{ds.data_id}`, "
+                        f"{ds.num_data_points} points, {ds.num_cycles} cycles"
+                    )
+                    st.session_state.llm_messages = []
+                    st.session_state.llm_analysis = None
+                    st.session_state.llm_dataset = None
+
+
+def _show_file_preview(path: Path):
+    suffix = path.suffix.lower()
+    if suffix in (".csv", ".txt", ".tsv"):
+        for enc in ["utf-8", "gbk", "latin-1"]:
+            try:
+                with open(path, "r", encoding=enc, errors="replace") as f:
+                    lines = [f.readline().rstrip() for _ in range(10)]
+                for i, line in enumerate(lines):
+                    st.code(f"L{i+1}: {line[:200]}", language=None)
+                break
+            except Exception:
+                continue
+    elif suffix in (".xlsx", ".xls"):
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(str(path), data_only=True)
+            st.markdown(f"**Sheets:** {wb.sheetnames}")
+            for sn in wb.sheetnames[:3]:
+                ws = wb[sn]
+                rows = list(ws.iter_rows(values_only=True, max_row=6))
+                if rows:
+                    st.markdown(f"**Sheet '{sn}'**:")
+                    for i, row in enumerate(rows):
+                        st.code(
+                            f"L{i+1}: {[str(v) if v is not None else '' for v in row][:10]}",
+                            language=None,
+                        )
+            wb.close()
+        except Exception as e:
+            st.error(f"Excel 读取失败: {e}")
+    elif suffix == ".npy":
+        st.info("二进制 numpy 文件，无法文本预览")
 
 
 def _explore_file(path: Path):
-    """Explore a file's structure and display findings."""
     suffix = path.suffix.lower()
     st.markdown(f"**扩展名:** `{suffix}`")
     st.markdown(f"**大小:** {path.stat().st_size / 1024:.1f} KB")
