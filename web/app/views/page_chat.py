@@ -1,4 +1,4 @@
-"""Chat page: AI-powered data analysis conversation. Direct core library."""
+"""Chat page: AI-powered chatbot with tool calling and long-term memory."""
 
 from __future__ import annotations
 
@@ -13,7 +13,8 @@ if _project_root not in sys.path:
 import streamlit as st
 
 from lmbagent.data.store import DataStore
-from lmbagent.agent import TOOL_REGISTRY, HANDLER_MAP
+from lmbagent.chat.memory import ChatMemory
+from lmbagent.chat.engine import chat_turn
 
 
 def _run_async(coro):
@@ -39,122 +40,190 @@ def render_chat_page():
 
 def _render():
     store = DataStore()
+    memory = ChatMemory()
 
-    st.header("AI 聊天")
+    st.header("💬 AI 聊天")
 
-    st.markdown("""
-    与AI助手对话，使用自然语言分析电池数据。可用工具：
-    """)
+    _init_session_state(memory)
 
-    with st.expander("可用工具列表"):
-        for t in TOOL_REGISTRY:
-            st.markdown(f"- **{t['name']}**: {t['description'][:80]}...")
+    col_sessions, col_chat = st.columns([1, 3])
 
-    if "chat_messages" not in st.session_state:
-        st.session_state.chat_messages = []
+    with col_sessions:
+        _render_sidebar(memory)
 
-    for msg in st.session_state.chat_messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+    with col_chat:
+        _render_chat_area(store, memory)
 
-    st.markdown("**快速指令:**")
-    quick_prompts = [
-        "加载 data/examples/pec.csv 并分析",
-        "列出所有已加载的实验",
-        "对比所有实验的容量衰减",
-    ]
-    cols = st.columns(len(quick_prompts))
-    for col, prompt in zip(cols, quick_prompts):
-        if col.button(prompt, key=f"quick_{prompt}"):
-            st.session_state.chat_messages.append({"role": "user", "content": prompt})
-            _process_prompt(prompt, store)
-            st.rerun()
 
-    if prompt := st.chat_input("输入分析指令..."):
-        st.session_state.chat_messages.append({"role": "user", "content": prompt})
-        _process_prompt(prompt, store)
+def _init_session_state(memory: ChatMemory):
+    if "chat_current_session" not in st.session_state:
+        sessions = memory.list_sessions()
+        if sessions:
+            st.session_state.chat_current_session = sessions[0]["session_id"]
+        else:
+            sid = memory.create_session("新对话")
+            st.session_state.chat_current_session = sid
+
+    if "chat_processing" not in st.session_state:
+        st.session_state.chat_processing = False
+
+
+def _render_sidebar(memory: ChatMemory):
+    st.subheader("对话历史")
+
+    if st.button("➕ 新建对话", use_container_width=True):
+        sid = memory.create_session("新对话")
+        st.session_state.chat_current_session = sid
         st.rerun()
 
+    sessions = memory.list_sessions()
+    for s in sessions:
+        col1, col2 = st.columns([4, 1])
+        is_active = s["session_id"] == st.session_state.chat_current_session
+        with col1:
+            label = f"{'👉 ' if is_active else ''}{s['title'][:20]}"
+            if st.button(label, key=f"sel_{s['session_id']}", use_container_width=True):
+                st.session_state.chat_current_session = s["session_id"]
+                st.rerun()
+        with col2:
+            if st.button("🗑", key=f"del_{s['session_id']}"):
+                memory.delete_session(s["session_id"])
+                if is_active:
+                    remaining = memory.list_sessions()
+                    if remaining:
+                        st.session_state.chat_current_session = remaining[0]["session_id"]
+                    else:
+                        st.session_state.chat_current_session = memory.create_session("新对话")
+                st.rerun()
 
-def _process_prompt(prompt: str, store: DataStore):
-    import re
+    st.divider()
 
-    prompt_lower = prompt.lower()
-    tokens = prompt_lower.split()
+    st.subheader("长期记忆")
+    all_mem = memory.get_all_memory()
+    if all_mem:
+        for k, v in all_mem.items():
+            st.markdown(f"**{k}**: {v}")
+        if st.button("清除所有记忆"):
+            memory.clear_memory()
+            st.rerun()
+    else:
+        st.caption("暂无长期记忆")
 
-    try:
-        if "加载" in prompt_lower or "load" in prompt_lower:
-            file_path = None
-            for t in tokens:
-                if t.endswith(".csv") or t.endswith(".xlsx") or t.endswith(".npy"):
-                    file_path = t
-                    break
-            if not file_path:
-                m = re.search(r'[\w/.]+\.(csv|xlsx|npy)', prompt)
-                if m:
-                    file_path = m.group(0)
 
-            if file_path:
-                handler = HANDLER_MAP["load_battery_data"]
-                result = _run_async(handler({"file_path": file_path}))
-                response = result["content"][0]["text"]
-            else:
-                response = "请指定文件路径，例如: 加载 data/examples/pec.csv"
+def _render_chat_area(store: DataStore, memory: ChatMemory):
+    session_id = st.session_state.chat_current_session
 
-        elif "列出" in prompt_lower or "list" in prompt_lower:
-            ids = store.list_ids()
-            if ids:
-                table = store.list_as_table()
-                response = f"已加载 {len(ids)} 个数据集:\n\n"
-                for _, row in table.iterrows():
-                    response += f"- `{row.get('data_id', '')}` — {row.get('cell_id', '')} ({row.get('cycles', '')} cycles)\n"
-            else:
-                response = "暂无数据集。请先加载数据。"
+    messages = memory.get_session_messages(session_id)
 
-        elif "对比" in prompt_lower or "compare" in prompt_lower:
-            ids = store.list_ids()
-            if len(ids) < 2:
-                response = "至少需要2个数据集才能对比。"
-            else:
-                handler = HANDLER_MAP["compare_experiments"]
-                result = _run_async(handler({"data_ids": ",".join(ids)}))
-                response = result["content"][0]["text"]
+    if not messages:
+        st.info(
+            "👋 你好！我是 LMBAgen AI 助手。\n\n"
+            "你可以：\n"
+            "- 📊 **分析数据**：加载文件、生成报告、对比实验\n"
+            "- 💡 **讨论问题**：电池科学、实验设计、数据分析方法\n"
+            "- 🧠 **记住信息**：告诉我你的研究课题和偏好，我会长期记住\n\n"
+            "直接输入任何问题或指令即可开始！"
+        )
 
-        elif "分析" in prompt_lower or "analyze" in prompt_lower:
-            active = st.session_state.get("active_dataset_id")
-            if not active:
-                ids = store.list_ids()
-                active = ids[0] if ids else None
-            if active:
-                handler = HANDLER_MAP["generate_report"]
-                result = _run_async(handler({"data_id": active}))
-                response = result["content"][0]["text"]
-            else:
-                response = "请先加载数据集。"
+    for msg in messages:
+        role = msg["role"]
+        content = msg["content"]
+        if role == "user":
+            with st.chat_message("user"):
+                st.markdown(content)
+        elif role == "assistant":
+            with st.chat_message("assistant"):
+                st.markdown(content)
+        elif role == "tool":
+            with st.chat_message("assistant"):
+                with st.expander("🔧 工具调用结果", expanded=False):
+                    st.code(content[:2000], language="text")
 
-        elif "退化" in prompt_lower or "degradation" in prompt_lower:
-            active = st.session_state.get("active_dataset_id")
-            if not active:
-                ids = store.list_ids()
-                active = ids[0] if ids else None
-            if active:
-                handler = HANDLER_MAP["analyze_failure_modes"]
-                result = _run_async(handler({"data_id": active}))
-                response = result["content"][0]["text"]
-            else:
-                response = "请先加载数据集。"
+    active_dataset_id = st.session_state.get("active_dataset_id")
+    num_datasets = len(store.list_ids())
 
-        else:
-            response = (
-                f"收到指令: \"{prompt}\"\n\n"
-                "我可以执行以下操作:\n"
-                "- 加载 <文件路径> — 加载数据\n"
-                "- 列出 — 列出所有数据集\n"
-                "- 对比 — 对比所有实验\n"
-                "- 分析 — 生成分析报告\n"
-                "- 退化 — 退化模式分解\n"
-            )
-    except Exception as e:
-        response = f"执行出错: {e}"
+    col_input = st.columns([6, 1])
+    with col_input[0]:
+        prompt = st.chat_input("输入消息...")
 
-    st.session_state.chat_messages.append({"role": "assistant", "content": response})
+    if prompt and not st.session_state.chat_processing:
+        st.session_state.chat_processing = True
+
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            with st.spinner("思考中..."):
+                try:
+                    response = _run_async(
+                        chat_turn(
+                            session_id=session_id,
+                            user_message=prompt,
+                            memory=memory,
+                            active_dataset_id=active_dataset_id,
+                            num_datasets=num_datasets,
+                        )
+                    )
+                    st.markdown(response)
+                except Exception as e:
+                    response = f"抱歉，处理出错: {e}"
+                    st.error(response)
+                    memory.add_message(session_id, "assistant", response)
+
+        if len(messages) == 0:
+            title = prompt[:30] + ("..." if len(prompt) > 30 else "")
+            memory.update_session_title(session_id, title)
+
+        st.session_state.chat_processing = False
+        st.rerun()
+
+    st.divider()
+    with st.expander("快捷指令"):
+        quick_prompts = [
+            "📊 列出所有已加载的数据集",
+            "📈 分析当前选中数据集的性能",
+            "⚖️ 对比所有实验的容量衰减",
+            "🔍 当前数据集的退化模式分析",
+            "💡 如何提高锂金属电池的循环寿命？",
+            "🧠 记住：我正在研究60℃下LFP电池的电解液优化",
+        ]
+        cols = st.columns(3)
+        for i, qp in enumerate(quick_prompts):
+            with cols[i % 3]:
+                if st.button(qp, key=f"quick_{i}", use_container_width=True):
+                    clean_prompt = qp.split(" ", 1)[-1] if " " in qp else qp
+                    st.session_state["_pending_prompt"] = clean_prompt
+                    st.rerun()
+
+    if "_pending_prompt" in st.session_state:
+        pp = st.session_state.pop("_pending_prompt")
+        st.session_state.chat_processing = True
+
+        with st.chat_message("user"):
+            st.markdown(pp)
+
+        with st.chat_message("assistant"):
+            with st.spinner("思考中..."):
+                try:
+                    response = _run_async(
+                        chat_turn(
+                            session_id=session_id,
+                            user_message=pp,
+                            memory=memory,
+                            active_dataset_id=active_dataset_id,
+                            num_datasets=num_datasets,
+                        )
+                    )
+                    st.markdown(response)
+                except Exception as e:
+                    response = f"抱歉，处理出错: {e}"
+                    st.error(response)
+                    memory.add_message(session_id, "assistant", response)
+
+        existing = memory.get_session_messages(session_id)
+        if len(existing) <= 2:
+            title = pp[:30] + ("..." if len(pp) > 30 else "")
+            memory.update_session_title(session_id, title)
+
+        st.session_state.chat_processing = False
+        st.rerun()

@@ -7,8 +7,12 @@ and determine the correct format and column mapping for loading battery data.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
+
+os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+os.environ.setdefault("LITELLM_MODE", "PRODUCTION")
 
 import litellm
 
@@ -123,6 +127,7 @@ Return ONLY the JSON object, no other text."""
         ],
         "api_key": config.get("api_key"),
         "temperature": 0.1,
+        "timeout": 30,
     }
     if config.get("base_url"):
         completion_kwargs["api_base"] = config["base_url"]
@@ -242,6 +247,7 @@ Rules:
         ],
         "api_key": config.get("api_key"),
         "temperature": 0.1,
+        "timeout": 30,
     }
     if config.get("base_url"):
         completion_kwargs["api_base"] = config["base_url"]
@@ -461,81 +467,27 @@ def _attempt_load_with_analysis(
     return None
 
 
-def llm_smart_load(file_path: str | Path, data_id: str | None = None) -> Any:
+def llm_smart_load(
+    file_path: str | Path,
+    data_id: str | None = None,
+    analysis: dict[str, Any] | None = None,
+) -> Any:
     """Use LLM to determine how to load a file, then load it.
 
-    Returns a BatteryDataset or raises an exception if loading fails.
+    Args:
+        file_path: Path to data file.
+        data_id: Optional dataset ID.
+        analysis: Pre-computed analysis from llm_analyze_file (avoids duplicate LLM call).
+
+    Returns:
+        BatteryDataset or raises an exception if loading fails.
     """
     from lmbagent.data.loader import load_auto, load_generic_csv
     from lmbagent.data.models import BatteryDataset
     import pandas as pd
 
     file_path = Path(file_path)
-    analysis = llm_analyze_file(file_path)
+    if analysis is None:
+        analysis = llm_analyze_file(file_path)
 
-    fmt = analysis.get("format", "generic_csv")
-    reasoning = analysis.get("reasoning", "")
-
-    # Try the suggested format first
-    if fmt in ("pec", "arbin", "neware_xlsx", "neware_npy"):
-        try:
-            ds = load_auto(file_path, data_id=data_id, format=fmt)
-            ds.metadata = ds.metadata or {}
-            ds.metadata["llm_analysis"] = analysis
-            return ds
-        except Exception:
-            pass
-
-    # Fall back to generic CSV with LLM-suggested column mapping
-    col_map = analysis.get("column_map", {})
-    separator = analysis.get("separator", ",")
-    skip_rows = analysis.get("skip_rows", 0)
-    encoding = analysis.get("encoding", "utf-8")
-
-    if col_map:
-        try:
-            encodings = [encoding, "utf-8", "gbk", "latin-1"]
-            df = None
-            for enc in encodings:
-                try:
-                    df = pd.read_csv(
-                        file_path,
-                        sep=separator,
-                        skiprows=skip_rows,
-                        encoding=enc,
-                        on_bad_lines="skip",
-                    )
-                    break
-                except Exception:
-                    continue
-
-            if df is not None and not df.empty:
-                rename_map = {}
-                for standard_name, actual_name in col_map.items():
-                    if actual_name and actual_name in df.columns:
-                        rename_map[actual_name] = standard_name
-                if rename_map:
-                    df = df.rename(columns=rename_map)
-
-                if "data_point" not in df.columns:
-                    df.insert(0, "data_point", range(len(df)))
-
-                if data_id is None:
-                    data_id = file_path.stem[:8]
-
-                ds = BatteryDataset(
-                    data_id=data_id,
-                    source_file=str(file_path),
-                    raw_data=df,
-                )
-                ds.metadata = ds.metadata or {}
-                ds.metadata["llm_analysis"] = analysis
-                return ds
-        except Exception:
-            pass
-
-    # Last resort: try auto
-    ds = load_auto(file_path, data_id=data_id)
-    ds.metadata = ds.metadata or {}
-    ds.metadata["llm_analysis"] = analysis
-    return ds
+    return _attempt_load_with_analysis(file_path, analysis, data_id)

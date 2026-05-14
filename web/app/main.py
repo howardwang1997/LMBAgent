@@ -94,7 +94,7 @@ with st.sidebar:
 
     page = st.radio(
         "导航",
-        ["📤 上传数据", "📊 数据集管理", "📈 可视化", "⚖️ 实验对比", "🔬 退化分析", "📐 DOE分析", "🔍 历史检索", "📝 结论管理", "📄 报告生成", "🤖 AI 聊天"],
+        ["📤 上传数据", "📊 数据集管理", "📈 可视化", "⚖️ 实验对比", "🔬 退化分析", "📐 DOE分析", "🔍 历史检索", "📝 结论管理", "📄 报告生成", "💬 AI 聊天"],
         label_visibility="collapsed",
     )
 
@@ -116,6 +116,18 @@ with st.sidebar:
         st.success("已清空")
         st.rerun()
 
+    st.divider()
+
+    st.markdown(
+        '<a href="http://27.54.45.156:8080/" target="_blank" '
+        'style="display:inline-block;width:100%;padding:0.5rem 1rem;'
+        'background:linear-gradient(135deg,#667eea,#764ba2);color:white;'
+        'text-align:center;border-radius:8px;text-decoration:none;'
+        'font-weight:600;font-size:0.9rem;">'
+        '🔎 Deep Research</a>',
+        unsafe_allow_html=True,
+    )
+
 PAGE_MAP = {
     "📤 上传数据": ("web.app.views.page_upload", "render_upload_page"),
     "📊 数据集管理": ("web.app.views.page_datasets", "render_datasets_page"),
@@ -126,8 +138,17 @@ PAGE_MAP = {
     "🔍 历史检索": ("web.app.views.page_search", "render_search_page"),
     "📝 结论管理": ("web.app.views.page_conclusions", "render_conclusions_page"),
     "📄 报告生成": ("web.app.views.page_report", "render_report_page"),
-    "🤖 AI 聊天": ("web.app.views.page_chat", "render_chat_page"),
+    "💬 AI 聊天": ("web.app.views.page_chat", "render_chat_page"),
 }
+
+st.markdown("""
+<script>
+if (!window._staticServerStarted) {
+    window._staticServerStarted = true;
+    fetch('/_stcore/health').then(() => {});
+}
+</script>
+""", unsafe_allow_html=True)
 
 module_name, func_name = PAGE_MAP[page]
 mod = __import__(module_name, fromlist=[func_name])

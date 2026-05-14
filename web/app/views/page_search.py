@@ -59,10 +59,15 @@ def _render():
                 label += f" — {ds.cell_id or ''} ({ds.num_cycles} cycles)"
 
             with st.expander(label, expanded=(i == 0)):
-                col_a, col_b, col_c = st.columns(3)
-                col_a.metric("得分", f"{r.score:.3f}")
-                col_b.metric("设计相似度", f"{r.design_similarity:.2f}")
-                col_c.metric("退化相似度", f"{r.degradation_similarity:.2f}")
+                col_a, col_b = st.columns(2)
+                col_a.metric("综合得分", f"{r.score:.3f}")
+                if r.design_similarity > 0.001:
+                    col_b.metric("设计相似度", f"{r.design_similarity:.2f}")
+                else:
+                    col_b.metric("设计相似度", "—")
+
+                if r.degradation_similarity > 0.001:
+                    st.metric("退化相似度", f"{r.degradation_similarity:.2f}")
 
                 st.markdown(f"**原因:** {r.reason}")
 

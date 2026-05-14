@@ -82,30 +82,58 @@ RAW_HEADER_MAP = {
     "备注": "备注",
 }
 
-DOE_CATEGORICAL_FACTORS = [
-    "挂测地点",
-    "cell_type",
-    "阴极",
-    "阳极",
-    "电解液",
-    "隔膜",
-    "夹具",
-    "缓冲垫",
-]
+DOE_FACTOR_GROUPS = {
+    "电芯信息": {
+        "categorical": ["挂测地点", "cell_type"],
+        "numeric": ["极片容量_Ah"],
+    },
+    "正极": {
+        "categorical": ["阴极", "阴极PN"],
+        "numeric": [],
+    },
+    "负极": {
+        "categorical": ["阳极", "阳极PN"],
+        "numeric": [],
+    },
+    "电解液": {
+        "categorical": ["电解液"],
+        "numeric": ["注液系数_g_Ah"],
+    },
+    "隔膜": {
+        "categorical": ["隔膜", "隔膜PN"],
+        "numeric": [],
+    },
+    "阻抗": {
+        "categorical": [],
+        "numeric": ["阻抗_ohm", "归一化阻抗_ohm_cm2"],
+    },
+    "测试条件": {
+        "categorical": [],
+        "numeric": [
+            "测试温度_C",
+            "充电电流_C",
+            "放电电流_C",
+            "上限电压_V",
+            "下限电压_V",
+            "SOC_pct",
+            "DOD_pct",
+        ],
+    },
+    "夹具与力学": {
+        "categorical": ["夹具", "缓冲垫"],
+        "numeric": ["预紧力_MPa", "缓冲垫厚度_mm"],
+    },
+    "工艺标记": {
+        "categorical": ["四边绝缘", "是否反向"],
+        "numeric": [],
+    },
+}
 
-DOE_NUMERIC_FACTORS = [
-    "测试温度_C",
-    "充电电流_C",
-    "放电电流_C",
-    "上限电压_V",
-    "下限电压_V",
-    "注液系数_g_Ah",
-    "极片容量_Ah",
-    "预紧力_MPa",
-    "缓冲垫厚度_mm",
-    "SOC_pct",
-    "DOD_pct",
-]
+DOE_CATEGORICAL_FACTORS = []
+DOE_NUMERIC_FACTORS = []
+for _group, _factors in DOE_FACTOR_GROUPS.items():
+    DOE_CATEGORICAL_FACTORS.extend(_factors.get("categorical", []))
+    DOE_NUMERIC_FACTORS.extend(_factors.get("numeric", []))
 
 DOE_ALL_FACTORS = DOE_CATEGORICAL_FACTORS + DOE_NUMERIC_FACTORS
 
@@ -147,22 +175,29 @@ class CellTestRecord(BaseModel):
             "挂测地点": self.location,
             "cell_type": self.cell_type,
             "阴极": self.cathode,
+            "阴极PN": self.cathode_pn,
             "阳极": self.anode,
+            "阳极PN": self.anode_pn,
             "电解液": self.electrolyte,
+            "注液系数_g_Ah": self.filling_coefficient_g_ah,
             "隔膜": self.separator,
-            "夹具": self.fixture,
-            "缓冲垫": self.buffer_pad,
+            "隔膜PN": self.separator_pn,
+            "阻抗_ohm": self.impedance_ohm,
+            "归一化阻抗_ohm_cm2": self.normalized_impedance_ohm_cm2,
             "测试温度_C": self.test_temperature_c,
             "充电电流_C": self.charge_rate_c,
             "放电电流_C": self.discharge_rate_c,
             "上限电压_V": self.upper_voltage_v,
             "下限电压_V": self.lower_voltage_v,
-            "注液系数_g_Ah": self.filling_coefficient_g_ah,
-            "极片容量_Ah": self.electrode_capacity_ah,
-            "预紧力_MPa": self.preload_mpa,
-            "缓冲垫厚度_mm": self.buffer_pad_thickness_mm,
             "SOC_pct": self.soc_pct,
             "DOD_pct": self.dod_pct,
+            "夹具": self.fixture,
+            "预紧力_MPa": self.preload_mpa,
+            "缓冲垫": self.buffer_pad,
+            "缓冲垫厚度_mm": self.buffer_pad_thickness_mm,
+            "极片容量_Ah": self.electrode_capacity_ah,
+            "四边绝缘": self.raw_row.get("四边绝缘", ""),
+            "是否反向": self.is_reversed,
         }
 
 

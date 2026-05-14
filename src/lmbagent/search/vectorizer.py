@@ -68,7 +68,9 @@ def compute_performance_vector(dataset: BatteryDataset) -> np.ndarray:
 
     while len(vec) < len(keys):
         vec.append(0.0)
-    return np.array(vec, dtype=np.float64)
+    arr = np.array(vec, dtype=np.float64)
+    arr = np.nan_to_num(arr, nan=0.0)
+    return arr
 
 
 def compute_degradation_vector(dataset: BatteryDataset) -> np.ndarray:

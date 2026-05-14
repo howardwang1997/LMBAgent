@@ -61,6 +61,7 @@ def _render():
 
     if st.button("运行退化模式分解"):
         with st.spinner("正在分解退化模式..."):
+            ds.ensure_raw_data()
             result = decompose_degradation_modes(ds)
 
             if "error" in result:

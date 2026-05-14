@@ -154,11 +154,16 @@ def compute_dataset_feature_vector(dataset: BatteryDataset) -> dict[str, float]:
     """Compute a fixed-dimension feature vector for an entire dataset.
 
     Used for similarity/contrast search and clustering.
+    Falls back to cycle_summary when raw_data is unavailable.
     """
     cs = dataset.cycle_summary
     feats = compute_cycle_features(dataset)
 
     vec: dict[str, float] = {}
+
+    if feats.empty and not cs.empty:
+        feats = _features_from_cycle_summary(cs)
+
     vec["num_cycles"] = float(len(feats))
 
     if feats.empty:
@@ -211,3 +216,34 @@ def compute_dataset_feature_vector(dataset: BatteryDataset) -> dict[str, float]:
     vec["retention_final"] = feats["retention"].iloc[-1] if "retention" in feats.columns and len(feats) > 0 else 0
 
     return vec
+
+
+def _features_from_cycle_summary(cs: pd.DataFrame) -> pd.DataFrame:
+    """Build a cycle-feature DataFrame from cycle_summary when raw_data is unavailable.
+
+    Returns a DataFrame compatible with compute_dataset_feature_vector's logic.
+    """
+    rows = []
+    for _, row in cs.iterrows():
+        r = {"cycle_index": row.get("cycle_index", 0)}
+        dc = row.get("discharge_capacity", 0)
+        r["discharge_cap"] = dc if dc and dc > 0 else 0
+        cc = row.get("charge_capacity", 0)
+        r["charge_cap"] = cc if cc and cc > 0 else 0
+        ce = row.get("coulombic_efficiency")
+        r["ce"] = ce if ce and ce > 0 else None
+        ir_c = row.get("ir_charge")
+        ir_d = row.get("ir_discharge")
+        r["ir_mean"] = ((ir_c or 0) + (ir_d or 0)) / 2 if (ir_c or ir_d) else None
+        ret = row.get("capacity_retention")
+        r["retention"] = ret if ret and ret > 0 else None
+        rows.append(r)
+
+    df = pd.DataFrame(rows)
+    if not df.empty and "discharge_cap" in df.columns:
+        valid = df[df["discharge_cap"] > 0]
+        if len(valid) > 0:
+            first_cap = valid["discharge_cap"].iloc[0]
+            if first_cap > 0:
+                df["retention"] = df["discharge_cap"] / first_cap * 100
+    return df

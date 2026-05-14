@@ -44,24 +44,29 @@ def generate_report(
     if dataset.cycle_summary.empty:
         add_cycle_summary(dataset)
 
+    dataset.ensure_raw_data()
+
+    has_raw = not dataset.raw_data.empty
+
     # Generate all plots (into plots/ subdirectory)
     plot_dir = output_dir / "plots"
     plot_dir.mkdir(parents=True, exist_ok=True)
 
-    _generate_plot_if_missing(plot_dir / "capacity_fade.png",
-                              lambda p: plot_capacity_fade(dataset, output_path=p))
-    _generate_plot_if_missing(plot_dir / "coulombic_efficiency.png",
-                              lambda p: plot_coulombic_efficiency(dataset, output_path=p))
-    _generate_plot_if_missing(plot_dir / "voltage_curves.png",
-                              lambda p: plot_voltage_curves(dataset, output_path=p))
-    _generate_plot_if_missing(plot_dir / "impedance.png",
-                              lambda p: plot_impedance(dataset, output_path=p))
+    if has_raw:
+        _generate_plot_if_missing(plot_dir / "capacity_fade.png",
+                                  lambda p: plot_capacity_fade(dataset, output_path=p))
+        _generate_plot_if_missing(plot_dir / "coulombic_efficiency.png",
+                                  lambda p: plot_coulombic_efficiency(dataset, output_path=p))
+        _generate_plot_if_missing(plot_dir / "voltage_curves.png",
+                                  lambda p: plot_voltage_curves(dataset, output_path=p))
+        _generate_plot_if_missing(plot_dir / "impedance.png",
+                                  lambda p: plot_impedance(dataset, output_path=p))
 
     # Use relative paths for images (relative to the report file)
-    rel_cap = "plots/capacity_fade.png"
-    rel_eff = "plots/coulombic_efficiency.png"
-    rel_volt = "plots/voltage_curves.png"
-    rel_imp = "plots/impedance.png"
+    rel_cap = "plots/capacity_fade.png" if has_raw else None
+    rel_eff = "plots/coulombic_efficiency.png" if has_raw else None
+    rel_volt = "plots/voltage_curves.png" if has_raw else None
+    rel_imp = "plots/impedance.png" if has_raw else None
 
     # Prepare template context
     raw = dataset.raw_data
@@ -70,6 +75,14 @@ def generate_report(
     # Compute cross-cycle insights
     insights = compute_insights(dataset)
 
+    if has_raw:
+        v_min = f"{raw['voltage'].min():.3f}" if "voltage" in raw else "N/A"
+        v_max = f"{raw['voltage'].max():.3f}" if "voltage" in raw else "N/A"
+        i_min = f"{raw['current'].min():.3f}" if "current" in raw else "N/A"
+        i_max = f"{raw['current'].max():.3f}" if "current" in raw else "N/A"
+    else:
+        v_min = v_max = i_min = i_max = "N/A"
+
     context = {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "source_file": dataset.source_file,
@@ -77,10 +90,10 @@ def generate_report(
         "start_datetime": str(dataset.start_datetime) if dataset.start_datetime else None,
         "num_data_points": dataset.num_data_points,
         "num_cycles": dataset.num_cycles,
-        "voltage_min": f"{raw['voltage'].min():.3f}" if "voltage" in raw else "N/A",
-        "voltage_max": f"{raw['voltage'].max():.3f}" if "voltage" in raw else "N/A",
-        "current_min": f"{raw['current'].min():.3f}" if "current" in raw else "N/A",
-        "current_max": f"{raw['current'].max():.3f}" if "current" in raw else "N/A",
+        "voltage_min": v_min,
+        "voltage_max": v_max,
+        "current_min": i_min,
+        "current_max": i_max,
         "cycle_summary": summary_records if summary_records else None,
         "capacity_plot": rel_cap,
         "efficiency_plot": rel_eff,

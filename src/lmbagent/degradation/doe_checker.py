@@ -20,7 +20,6 @@ import pandas as pd
 
 from lmbagent.data.models import BatteryDataset
 from lmbagent.data.schema import ExperimentDesign
-from lmbagent.degradation.decomposition import decompose_degradation_modes
 
 
 GENERIC_NUMERIC_FIELDS = [
@@ -245,9 +244,6 @@ def analyze_design_impact(
 
     outcomes = []
     for ds in datasets:
-        result = decompose_degradation_modes(ds)
-        dominant = result.get("dominant_mode", "unknown")
-        contributions = result.get("mode_contributions", {})
         fade = 0
         if not ds.cycle_summary.empty:
             cs = ds.cycle_summary
@@ -256,9 +252,7 @@ def analyze_design_impact(
                 fade = (1 - valid.iloc[-1]["discharge_capacity"] / valid.iloc[0]["discharge_capacity"]) * 100
         outcomes.append({
             "data_id": ds.data_id,
-            "dominant_mode": dominant,
             "fade_pct": fade,
-            **contributions,
         })
 
     outcome_df = pd.DataFrame(outcomes)
@@ -311,9 +305,6 @@ def analyze_design_impact(
                 groups[str(val)] = {"mean_fade": round(float(group_fade.mean()), 2),
                                    "n": int(len(group_fade))}
         factor_result["groups"] = groups
-
-        dominant_modes = merged.loc[merged[factor].isin(vals.unique()), "dominant_mode"].value_counts()
-        factor_result["dominant_modes_by_factor"] = dominant_modes.to_dict()
 
         results[factor] = factor_result
 
