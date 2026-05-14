@@ -128,6 +128,9 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
+    if st.button("📊 项目汇报", use_container_width=True):
+        st.session_state.show_presentation = not st.session_state.get("show_presentation", False)
+
 PAGE_MAP = {
     "📤 上传数据": ("web.app.views.page_upload", "render_upload_page"),
     "📊 数据集管理": ("web.app.views.page_datasets", "render_datasets_page"),
@@ -151,13 +154,24 @@ if (!window._staticServerStarted) {
 """, unsafe_allow_html=True)
 
 module_name, func_name = PAGE_MAP[page]
-mod = __import__(module_name, fromlist=[func_name])
-render_fn = getattr(mod, func_name)
 
-try:
-    render_fn()
-except Exception as e:
-    st.error(f"页面渲染出错: {e}")
-    with st.expander("详细错误信息"):
-        st.code(traceback.format_exc())
-    st.info("请刷新页面重试，或切换到其他页面。")
+if st.session_state.get("show_presentation"):
+    pres_path = Path(__file__).parent.parent / "static" / "presentation.html"
+    if pres_path.exists():
+        with open(pres_path, "r", encoding="utf-8") as f:
+            pres_html = f.read()
+        st.components.v1.html(pres_html, height=800, scrolling=True)
+        st.info("点击侧边栏「📊 项目汇报」按钮关闭演示")
+    else:
+        st.warning("演示文件不存在")
+else:
+    mod = __import__(module_name, fromlist=[func_name])
+    render_fn = getattr(mod, func_name)
+
+    try:
+        render_fn()
+    except Exception as e:
+        st.error(f"页面渲染出错: {e}")
+        with st.expander("详细错误信息"):
+            st.code(traceback.format_exc())
+        st.info("请刷新页面重试，或切换到其他页面。")

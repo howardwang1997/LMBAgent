@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LMBAgent - 项目汇报</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --r-background-color: #0f172a;
+  --r-heading-font: "Noto Sans SC", sans-serif;
+  --r-main-font: "Noto Sans SC", sans-serif;
+  --r-main-font-size: 22px;
+  --r-heading1-size: 2.6em;
+  --r-heading2-size: 1.8em;
+  --r-heading3-size: 1.3em;
+  --r-main-color: #e2e8f0;
+  --r-heading-color: #f1f5f9;
+  --r-link-color: #60a5fa;
+  --blue: #60a5fa;
+  --purple: #a78bfa;
+  --pink: #f472b6;
+  --green: #4ade80;
+  --orange: #fb923c;
+  --cyan: #22d3ee;
+  --gray: #94a3b8;
+  --dark: #1e293b;
+  --border: #334155;
+}
+
+.reveal-viewport { background: var(--r-background-color); }
+.reveal { font-family: "Noto Sans SC", sans-serif; }
+.reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+  font-family: "Noto Sans SC", sans-serif;
+  font-weight: 700;
+  text-transform: none;
+  text-shadow: none;
+  letter-spacing: 0;
+}
+.reveal h1 { font-size: var(--r-heading1-size); }
+.reveal h2 { font-size: var(--r-heading2-size); color: var(--r-heading-color); }
+.reveal h3 { font-size: var(--r-heading3-size); color: var(--blue); }
+.reveal p, .reveal li { color: var(--r-main-color); line-height: 1.7; }
+.reveal ul { list-style: none; padding-left: 0; }
+.reveal ul li { position: relative; padding-left: 24px; margin-bottom: 6px; }
+.reveal ul li::before { content: "▸"; position: absolute; left: 0; color: var(--blue); font-weight: 700; }
+.reveal a { color: var(--r-link-color); text-decoration: none; }
+.reveal code { font-family: "SF Mono", "Fira Code", monospace; background: var(--dark); padding: 2px 8px; border-radius: 4px; font-size: 0.8em; color: var(--green); }
+.reveal pre { width: 100%; }
+.reveal pre code { display: block; padding: 16px; background: var(--dark); border: 1px solid var(--border); border-radius: 8px; font-size: 0.7em; line-height: 1.5; }
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--blue), var(--purple), var(--pink));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.accent { color: var(--purple); }
+
+.badge {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 16px;
+  font-size: 0.65em;
+  font-weight: 600;
+  margin: 4px;
+  vertical-align: middle;
+}
+.badge-blue { background: #1e3a5f; color: var(--blue); }
+.badge-purple { background: #3b1f5e; color: var(--purple); }
+.badge-green { background: #1a3a2a; color: var(--green); }
+.badge-orange { background: #3b2a1a; color: var(--orange); }
+.badge-cyan { background: #1a3a3a; color: var(--cyan); }
+.badge-pink { background: #3b1a2a; color: var(--pink); }
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  text-align: left;
+  margin-top: 20px;
+}
+.card {
+  background: var(--dark);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  transition: border-color 0.3s;
+}
+.card:hover { border-color: var(--blue); }
+.card h4 { color: var(--r-heading-color); font-size: 0.9em; margin-bottom: 8px; }
+.card p { font-size: 0.7em; color: var(--gray); line-height: 1.5; }
+.card .icon { font-size: 1.6em; margin-bottom: 8px; }
+
+.arch-layer {
+  display: flex;
+  align-items: stretch;
+  margin: 8px 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.arch-layer .label {
+  min-width: 140px;
+  padding: 12px 16px;
+  font-weight: 700;
+  font-size: 0.7em;
+  display: flex;
+  align-items: center;
+  color: #fff;
+  writing-mode: horizontal-tb;
+}
+.arch-layer .content {
+  flex: 1;
+  padding: 12px 16px;
+  background: var(--dark);
+  border: 1px solid var(--border);
+  font-size: 0.65em;
+  color: var(--gray);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.arch-layer .content .tag {
+  background: rgba(96,165,250,0.1);
+  border: 1px solid rgba(96,165,250,0.3);
+  color: var(--blue);
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+}
+.stat {
+  text-align: center;
+  min-width: 100px;
+}
+.stat .value {
+  font-size: 2.2em;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--blue), var(--purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.stat .label { font-size: 0.6em; color: var(--gray); margin-top: 4px; }
+
+.screenshot {
+  background: var(--dark);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--gray);
+  font-size: 0.75em;
+  margin-top: 16px;
+}
+
+.flow-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 0.7em;
+}
+.flow-arrow .arrow { color: var(--purple); font-size: 1.4em; }
+.flow-box {
+  background: var(--dark);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 20px;
+  text-align: center;
+  min-width: 140px;
+}
+.flow-box .title { color: var(--blue); font-weight: 700; font-size: 0.85em; }
+.flow-box .desc { color: var(--gray); font-size: 0.75em; margin-top: 2px; }
+
+.table-wrap {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+.table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.6em;
+}
+.table-wrap th {
+  background: var(--dark);
+  color: var(--blue);
+  padding: 8px 12px;
+  text-align: left;
+  border: 1px solid var(--border);
+  font-weight: 700;
+}
+.table-wrap td {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  color: var(--r-main-color);
+}
+
+.timeline {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24px;
+  position: relative;
+}
+.timeline::before {
+  content: "";
+  position: absolute;
+  top: 20px;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: var(--border);
+}
+.timeline .phase {
+  text-align: center;
+  flex: 1;
+  position: relative;
+}
+.timeline .phase .dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--blue);
+  margin: 12px auto;
+  border: 3px solid var(--r-background-color);
+  box-shadow: 0 0 0 2px var(--blue);
+  position: relative;
+  z-index: 1;
+}
+.timeline .phase .week { font-size: 0.65em; color: var(--blue); font-weight: 700; }
+.timeline .phase .title { font-size: 0.6em; color: var(--r-heading-color); font-weight: 600; }
+.timeline .phase .desc { font-size: 0.5em; color: var(--gray); margin-top: 4px; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; text-align: left; }
+.small { font-size: 0.65em; }
+.fragment.fade-up { opacity: 0; transform: translateY(20px); }
+.fragment.fade-up.visible { opacity: 1; transform: translateY(0); }
+
+.highlight-box {
+  background: linear-gradient(135deg, rgba(96,165,250,0.08), rgba(167,139,250,0.08));
+  border: 1px solid rgba(96,165,250,0.3);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 16px;
+}
+.highlight-box h4 { color: var(--blue); font-size: 0.85em; margin-bottom: 8px; }
+.highlight-box p { font-size: 0.7em; color: var(--gray); }
+
+.reveal .progress { color: var(--blue); height: 3px; }
+.reveal .controls button { color: var(--gray); }
+.reveal .slide-number { color: var(--gray); font-size: 0.5em; }
+</style>
+</head>
+<body>
+
+<div class="reveal">
+<div class="slides">
+
+<!-- ============ SLIDE 1: Cover ============ -->
+<section data-transition="fade">
+  <p style="margin-bottom:20px">
+    <span class="badge badge-blue">Python 3.14</span>
+    <span class="badge badge-purple">MiniMax M2.7</span>
+    <span class="badge badge-green">Streamlit</span>
+    <span class="badge badge-orange">7-Mode NNLS</span>
+  </p>
+  <h1><span class="gradient-text">LMBAgent</span></h1>
+  <h3 style="color:var(--gray);font-weight:300;font-size:0.9em">Lithium Metal Battery Data Analysis Agent</h3>
+  <p style="margin-top:30px;color:var(--gray);font-size:0.65em">
+    锂金属电池数据分析智能体 &mdash; 项目汇报
+  </p>
+</section>
+
+<!-- ============ SLIDE 2: Background ============ -->
+<section>
+  <h2>项目背景与动机</h2>
+  <div class="two-col">
+    <div>
+      <h3 style="font-size:0.9em">现实痛点</h3>
+      <ul class="small">
+        <li><strong>数据格式混乱</strong> — PEC、Arbin、Neware、TVC 等设备格式各异，手工处理耗时</li>
+        <li><strong>分析流程碎片化</strong> — 加载、清洗、可视化、报告分散在不同工具中</li>
+        <li><strong>跨实验知识缺失</strong> — 历史实验数据难以检索、对比、积累经验</li>
+        <li><strong>DOE 分析不系统</strong> — 实验设计因子多、组合复杂，人工难以全面分析</li>
+        <li><strong>结论缺乏追溯</strong> — 实验结论散落在文档中，无法自动验证与更新</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="font-size:0.9em">我们的目标</h3>
+      <div class="highlight-box">
+        <h4>一站式 AI 驱动的电池数据分析平台</h4>
+        <p>将数据加载、分析、可视化、DOE 优化、历史检索、结论管理整合为统一工作流，通过 LLM Agent 实现自然语言交互</p>
+      </div>
+      <div class="highlight-box" style="margin-top:12px">
+        <h4>让数据自己说话</h4>
+        <p>7-mode NNLS 量化退化、3D 向量化历史检索、DOE 覆盖率自动分析、结论自动验证 &mdash; 构建可积累的实验知识库</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 3: Solution Overview ============ -->
+<section>
+  <h2>LMBAgent 一句话定位</h2>
+  <p style="font-size:0.85em;text-align:center;margin:20px 0;line-height:1.8">
+    <strong style="color:var(--blue)">LLM Agent</strong> + <strong style="color:var(--purple)">电池数据分析引擎</strong> + <strong style="color:var(--green)">Web 交互界面</strong>
+  </p>
+  <div class="flow-arrow">
+    <div class="flow-box"><div class="title">自然语言输入</div><div class="desc">上传/分析/对比/搜索</div></div>
+    <div class="arrow">→</div>
+    <div class="flow-box" style="border-color:var(--purple)"><div class="title" style="color:var(--purple)">LLM Agent</div><div class="desc">理解意图 → 调用工具</div></div>
+    <div class="arrow">→</div>
+    <div class="flow-box" style="border-color:var(--green)"><div class="title" style="color:var(--green)">分析引擎</div><div class="desc">NNLS/DOE/搜索/对比</div></div>
+    <div class="arrow">→</div>
+    <div class="flow-box" style="border-color:var(--orange)"><div class="title" style="color:var(--orange)">结果输出</div><div class="desc">图表/报告/结论</div></div>
+  </div>
+  <div class="stat-row">
+    <div class="stat"><div class="value">19</div><div class="label">LLM 工具</div></div>
+    <div class="stat"><div class="value">10</div><div class="label">UI 页面</div></div>
+    <div class="stat"><div class="value">142</div><div class="label">测试用例</div></div>
+    <div class="stat"><div class="value">7+</div><div class="label">数据格式</div></div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 4: Architecture ============ -->
+<section>
+  <h2>系统架构</h2>
+  <div style="text-align:left;margin-top:12px">
+    <div class="arch-layer">
+      <div class="label" style="background:linear-gradient(135deg,#1e3a5f,#2563eb)">UI Layer</div>
+      <div class="content">
+        <span class="tag">上传数据</span><span class="tag">数据集管理</span><span class="tag">可视化</span>
+        <span class="tag">实验对比</span><span class="tag">退化分析</span><span class="tag">DOE分析</span>
+        <span class="tag">历史检索</span><span class="tag">结论管理</span><span class="tag">报告生成</span><span class="tag">AI聊天</span>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="label" style="background:linear-gradient(135deg,#3b1f5e,#7c3aed)">Agent Layer</div>
+      <div class="content">
+        <span class="tag">Chat Engine</span><span class="tag">19 Tool Handlers</span><span class="tag">LiteLLM Backend</span>
+        <span class="tag">Claude Agent SDK</span><span class="tag">Provider Router</span>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="label" style="background:linear-gradient(135deg,#1a3a2a,#16a34a)">Analysis Engine</div>
+      <div class="content">
+        <span class="tag">7-Mode NNLS</span><span class="tag">DOE Checker</span><span class="tag">3D Search Engine</span>
+        <span class="tag">Conclusion Verifier</span><span class="tag">Report Generator</span>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="label" style="background:linear-gradient(135deg,#3b2a1a,#ea580c)">Data Layer</div>
+      <div class="content">
+        <span class="tag">SQLite</span><span class="tag">PEC/Arbin/Neware/TVC/CSV Loaders</span>
+        <span class="tag">LLM Smart Loader</span><span class="tag">Template Parser</span><span class="tag">Chat Memory DB</span>
+      </div>
+    </div>
+    <div class="arch-layer">
+      <div class="label" style="background:linear-gradient(135deg,#1a3a3a,#0891b2)">LLM Provider</div>
+      <div class="content">
+        <span class="tag">MiniMax M2.7</span><span class="tag">OpenAI</span><span class="tag">Grok</span>
+        <span class="tag">DeepSeek</span><span class="tag">Claude</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 5: Data Loading ============ -->
+<section>
+  <h2>数据加载能力</h2>
+  <div class="two-col">
+    <div>
+      <h3 style="font-size:0.85em">支持的格式</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>格式</th><th>来源</th><th>特点</th></tr></thead>
+          <tbody>
+            <tr><td><code>PEC</code></td><td>PEC 设备</td><td>15列，mV/mA/mAh 单位</td></tr>
+            <tr><td><code>Arbin</code></td><td>Arbin 设备</td><td>8列，标准 SI 单位</td></tr>
+            <tr><td><code>Neware-A</code></td><td>Neware 中文列</td><td>20+列中文名</td></tr>
+            <tr><td><code>Neware-B</code></td><td>Neware 英文列</td><td>10列英文名</td></tr>
+            <tr><td><code>TVC</code></td><td>TVC 设备</td><td>通用加载器</td></tr>
+            <tr><td><code>Generic CSV</code></td><td>通用</td><td>50+别名自动匹配</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <h3 style="font-size:0.85em">4 级加载策略</h3>
+      <div class="flow-arrow" style="flex-direction:column;align-items:stretch;gap:4px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="color:var(--green);font-weight:700;font-size:0.75em;width:20px">1</span>
+          <span class="small" style="flex:1"><strong>标准格式</strong> — 已知格式直接加载</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="color:var(--blue);font-weight:700;font-size:0.75em;width:20px">2</span>
+          <span class="small" style="flex:1"><strong>别名匹配</strong> — 50+列名别名自动映射</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="color:var(--purple);font-weight:700;font-size:0.75em;width:20px">3</span>
+          <span class="small" style="flex:1"><strong>LLM 智能分析</strong> — AI 分析文件头，自动确定格式与列映射</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="color:var(--orange);font-weight:700;font-size:0.75em;width:20px">4</span>
+          <span class="small" style="flex:1"><strong>对话式校对</strong> — 多轮 NL 对话修正加载参数</span>
+        </div>
+      </div>
+      <div class="highlight-box" style="margin-top:12px">
+        <h4>电芯挂测表模板解析</h4>
+        <p>解析 45 列模板 xlsx，自动提取 26 个 DOE 因子（9 组），匹配循环数据文件</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 6: Degradation Decomposition ============ -->
+<section>
+  <h2>技术亮点：7 模式退化分解</h2>
+  <div class="two-col">
+    <div>
+      <h3 style="font-size:0.85em">NNLS 分解原理</h3>
+      <pre><code>ΔV(t) = Σ wᵢ · Sᵢ(t)
+
+# 7 种退化模式:
+S₁: SEI Growth       (SEI 膜生长)
+S₂: Li Plating       (锂析出)
+S₃: LAM_pos          (正极活性物质损失)
+S₄: LAM_neg          (负极活性物质损失)
+S₅: R Growth         (阻抗增长)
+S₆: Diffusion        (扩散退化)
+S₇: Electrolyte Loss (电解液耗竭)
+
+# 求解: min ||ΔV - S·w||₂² s.t. w ≥ 0</code></pre>
+      <p class="small" style="margin-top:8px;color:var(--gray)">基于基准循环电压曲线计算 ΔV(t)，通过预定义的退化特征签名矩阵进行 NNLS 求解</p>
+    </div>
+    <div>
+      <h3 style="font-size:0.85em">输出结果</h3>
+      <ul class="small">
+        <li><strong>各模式权重</strong> — 量化每种退化机制的贡献占比</li>
+        <li><strong>主导模式判定</strong> — 自动识别主要退化机制</li>
+        <li><strong>逐圈演化</strong> — 跟踪退化模式随循环的演变趋势</li>
+        <li><strong>可视化</strong> — 堆叠面积图 + 模式贡献饼图</li>
+      </ul>
+      <div class="screenshot" style="margin-top:12px">
+        📊 退化分解可视化 — 堆叠面积图展示 7 模式贡献
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 7: DOE Analysis ============ -->
+<section>
+  <h2>DOE 设计空间分析</h2>
+  <div class="two-col">
+    <div>
+      <h3 style="font-size:0.85em">26 个 DOE 因子 (9 组)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>组别</th><th>因子</th></tr></thead>
+          <tbody>
+            <tr><td>电极</td><td>阴极、阳极</td></tr>
+            <tr><td>电解液</td><td>电解液配方</td></tr>
+            <tr><td>隔膜</td><td>隔膜类型</td></tr>
+            <tr><td>温度</td><td>测试温度</td></tr>
+            <tr><td>电流</td><td>充/放电电流</td></tr>
+            <tr><td>电压窗口</td><td>上限/下限电压</td></tr>
+            <tr><td>结构</td><td>注液系数、夹具、预紧力、缓冲垫</td></tr>
+            <tr><td>状态</td><td>SOC、DOD</td></tr>
+            <tr><td>其他</td><td>电芯型号、内阻、绝缘等</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <h3 style="font-size:0.85em">6 页 DOE 仪表盘</h3>
+      <ul class="small">
+        <li><strong>总览</strong> — 甜甜圈图（因子/组合覆盖率）</li>
+        <li><strong>因子详情</strong> — 每个因子的值分布饼图</li>
+        <li><strong>层级探索</strong> — Sunburst 层级钻取</li>
+        <li><strong>组合热力图</strong> — 因子对覆盖密度</li>
+        <li><strong>衰减影响</strong> — Sankey 图（因子→衰减率）</li>
+        <li><strong>因子影响</strong> — 箱线图 + 柱状图</li>
+      </ul>
+      <div class="screenshot">
+        📊 DOE 仪表盘 — Sankey + Heatmap + Sunburst
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 8: Multi-Experiment Comparison ============ -->
+<section>
+  <h2>多实验对比分析</h2>
+  <div class="cards">
+    <div class="card">
+      <div class="icon">📈</div>
+      <h4>Overlay 叠加曲线</h4>
+      <p>容量衰减、库仑效率、电压曲线的多实验叠加对比，一目了然发现差异</p>
+    </div>
+    <div class="card">
+      <div class="icon">📊</div>
+      <h4>Delta-V 分析</h4>
+      <p>两实验电压差值分析 (dQ/dV)，精确定位电压响应差异的位置与幅度</p>
+    </div>
+    <div class="card">
+      <div class="icon">📋</div>
+      <h4>性能指标表</h4>
+      <p>自动生成跨实验对比表：容量保持率、库仑效率、阻抗、衰减率、设计因子差异</p>
+    </div>
+  </div>
+  <div class="screenshot" style="margin-top:16px">
+    📊 多实验对比页面 — Overlay + Metrics Table + Delta-V
+  </div>
+</section>
+
+<!-- ============ SLIDE 9: Historical Search ============ -->
+<section>
+  <h2>3D 向量历史检索</h2>
+  <div class="two-col">
+    <div>
+      <h3 style="font-size:0.85em">三维特征向量</h3>
+      <div class="highlight-box">
+        <h4>设计向量 (Design)</h4>
+        <p>26 个 DOE 因子 one-hot 编码，捕捉实验设计差异</p>
+      </div>
+      <div class="highlight-box">
+        <h4>性能向量 (Performance)</h4>
+        <p>循环数据的统计特征（容量、CE、阻抗的均值/方差/趋势）</p>
+      </div>
+      <div class="highlight-box">
+        <h4>退化向量 (Degradation)</h4>
+        <p>NNLS 7 模式权重，表征退化模式差异</p>
+      </div>
+    </div>
+    <div>
+      <h3 style="font-size:0.85em">搜索模式</h3>
+      <ul class="small">
+        <li><strong style="color:var(--green)">相似搜索</strong> — 综合向量余弦相似度 Top-K</li>
+        <li><strong style="color:var(--orange)">对比搜索</strong> — 设计相似但退化模式不同的实验</li>
+      </ul>
+      <pre style="margin-top:16px"><code>similarity = cosine_similarity(
+    query_vector,  # 3D concatenated
+    candidate_vectors
+)
+
+# Contrast mode:
+# high design_sim AND low degradation_sim</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 10: Conclusion Management ============ -->
+<section>
+  <h2>结论管理与验证</h2>
+  <div class="two-col">
+    <div>
+      <h3 style="font-size:0.85em">5 状态生命周期</h3>
+      <div class="flow-arrow" style="flex-direction:column;align-items:stretch;gap:2px">
+        <div class="flow-box" style="padding:8px 16px"><span class="title" style="color:var(--green)">active</span> <span class="desc">— 新建结论</span></div>
+        <div style="text-align:center;color:var(--purple);font-size:1.2em">↓</div>
+        <div class="flow-box" style="padding:8px 16px"><span class="title" style="color:var(--blue)">supported</span> <span class="desc">— 被新数据支持</span></div>
+        <div style="text-align:center;color:var(--orange);font-size:1.2em">↓</div>
+        <div class="flow-box" style="padding:8px 16px"><span class="title" style="color:var(--orange)">challenged</span> <span class="desc">— 被新数据质疑</span></div>
+        <div style="text-align:center;color:var(--pink);font-size:1.2em">↓</div>
+        <div class="flow-box" style="padding:8px 16px"><span class="title" style="color:var(--cyan)">superseded</span> <span class="desc">— 被更好结论替代</span></div>
+        <div style="text-align:center;color:var(--gray);font-size:1.2em">↓</div>
+        <div class="flow-box" style="padding:8px 16px"><span class="title" style="color:var(--gray)">retracted</span> <span class="desc">— 已撤回</span></div>
+      </div>
+    </div>
+    <div>
+      <h3 style="font-size:0.85em">自动验证流程</h3>
+      <ul class="small">
+        <li>新增数据集时自动触发验证</li>
+        <li>比对结论与证据数据集的性能指标</li>
+        <li>判定：<strong style="color:var(--green)">supported</strong> / <strong style="color:var(--orange)">challenged</strong> / <strong style="color:var(--gray)">inconclusive</strong></li>
+        <li>关联证据 ID，可追溯到具体实验</li>
+        <li>支持置信度 (low/medium/high) 和范围标签</li>
+      </ul>
+      <div class="highlight-box" style="margin-top:12px">
+        <h4>构建可积累的实验知识库</h4>
+        <p>每次验证都在强化或修正已有认知，让实验结论随数据积累而不断进化</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 11: AI Chat ============ -->
+<section>
+  <h2>AI 智能聊天</h2>
+  <div class="two-col">
+    <div>
+      <h3 style="font-size:0.85em">核心能力</h3>
+      <ul class="small">
+        <li><strong>自然对话</strong> — 回答电池科学、实验设计、数据分析相关问题</li>
+        <li><strong>工具调用</strong> — 需要数据操作时自动调用 19 个工具</li>
+        <li><strong>长期记忆</strong> — SQLite 持久化，记住用户偏好与研究背景</li>
+        <li><strong>会话管理</strong> — 多会话切换，历史记录永久保存</li>
+      </ul>
+      <div class="highlight-box" style="margin-top:12px">
+        <h4>记忆提取</h4>
+        <p>AI 自动识别对话中值得记住的信息（研究课题、实验条件、个人偏好），持久化存储到 SQLite</p>
+      </div>
+    </div>
+    <div>
+      <h3 style="font-size:0.85em">工作流程</h3>
+      <pre><code>用户输入
+  ↓
+构建 System Prompt
+  (工具描述 + 长期记忆 + 数据上下文)
+  ↓
+LLM 判断 → 直接回答 OR 调用工具
+  ↓                       ↓
+返回文本          执行工具 → 结果反馈 LLM
+  ↓                       ↓
+提取长期记忆 ← ← ← ← ← 生成最终回复
+  ↓
+保存到 SQLite</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 12: Report Generation ============ -->
+<section>
+  <h2>报告生成</h2>
+  <div class="two-col">
+    <div>
+      <h3 style="font-size:0.85em">输出格式</h3>
+      <div class="cards" style="grid-template-columns:1fr">
+        <div class="card">
+          <h4><span class="badge badge-blue">Markdown</span> 基础格式</h4>
+          <p>Jinja2 模板渲染，嵌入图表路径、数据表格、分析注释</p>
+        </div>
+        <div class="card">
+          <h4><span class="badge badge-purple">HTML</span> 富文本格式</h4>
+          <p>Markdown → HTML 转换，内联样式，可直接浏览器查看</p>
+        </div>
+        <div class="card">
+          <h4><span class="badge badge-green">PDF</span> 打印格式</h4>
+          <p>weasyprint 渲染，完整排版，适合正式报告提交</p>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3 style="font-size:0.85em">报告内容</h3>
+      <ul class="small">
+        <li>摘要统计（数据点数、循环数、电压/电流范围）</li>
+        <li>关键发现（健康评估、异常检测）</li>
+        <li>循环性能表（容量/CE/能量效率/保持率）</li>
+        <li>容量分析（初始/最终/最大/衰减率）</li>
+        <li>效率分析（库仑效率/能量效率统计）</li>
+        <li>电压分析（范围/滞后/极化）</li>
+        <li>阻抗分析</li>
+        <li>可视化图表（容量衰减/CE/电压曲线/内阻）</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 13: Tool Registry ============ -->
+<section>
+  <h2>19 个 LLM 工具一览</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>分类</th><th>工具名</th><th>功能</th></tr></thead>
+      <tbody>
+        <tr><td rowspan="3" style="color:var(--green);font-weight:700">数据操作</td><td><code>load_battery_data</code></td><td>加载电池循环数据，自动检测格式</td></tr>
+        <tr><td><code>transform_data</code></td><td>计算周期摘要，筛选循环范围</td></tr>
+        <tr><td><code>list_experiments</code></td><td>列出已加载实验，支持筛选</td></tr>
+        <tr><td rowspan="4" style="color:var(--blue);font-weight:700">可视化</td><td><code>plot_capacity_fade</code></td><td>容量衰减图</td></tr>
+        <tr><td><code>plot_coulombic_efficiency</code></td><td>库仑效率图</td></tr>
+        <tr><td><code>plot_voltage_curves</code></td><td>电压曲线图</td></tr>
+        <tr><td><code>plot_impedance</code></td><td>阻抗趋势图</td></tr>
+        <tr><td rowspan="3" style="color:var(--purple);font-weight:700">对比分析</td><td><code>compare_experiments</code></td><td>多实验指标对比表</td></tr>
+        <tr><td><code>overlay_plot</code></td><td>叠加对比图</td></tr>
+        <tr><td><code>delta_analysis</code></td><td>Delta-V 电压差值分析</td></tr>
+        <tr><td rowspan="4" style="color:var(--orange);font-weight:700">退化与DOE</td><td><code>analyze_failure_modes</code></td><td>7-mode NNLS 退化分解</td></tr>
+        <tr><td><code>analyze_design_impact</code></td><td>设计因子影响分析</td></tr>
+        <tr><td><code>check_doe_coverage</code></td><td>DOE 覆盖率检查</td></tr>
+        <tr><td><code>recommend_experiments</code></td><td>推荐补充实验</td></tr>
+        <tr><td rowspan="5" style="color:var(--cyan);font-weight:700">知识管理</td><td><code>search_similar</code></td><td>相似/对比历史检索</td></tr>
+        <tr><td><code>manage_conclusion</code></td><td>结论 CRUD + 状态管理</td></tr>
+        <tr><td><code>verify_with_new_data</code></td><td>新数据验证结论</td></tr>
+        <tr><td><code>scan_and_import</code></td><td>目录扫描批量导入</td></tr>
+        <tr><td><code>template_doe_analysis</code></td><td>模板 DOE 分析</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ SLIDE 14: Web UI Overview ============ -->
+<section>
+  <h2>Web UI 概览 — 10 个页面</h2>
+  <div class="cards">
+    <div class="card"><div class="icon">📤</div><h4>上传数据</h4><p>单文件/批量/目录扫描/AI探索/AI智能加载 5 个标签页</p></div>
+    <div class="card"><div class="icon">📊</div><h4>数据集管理</h4><p>数据集列表、详情查看、设计元数据展示</p></div>
+    <div class="card"><div class="icon">📈</div><h4>可视化</h4><p>容量衰减/CE/电压曲线/阻抗 4 类图表</p></div>
+    <div class="card"><div class="icon">⚖️</div><h4>实验对比</h4><p>Overlay 叠加图 + Delta-V + Metrics Table</p></div>
+    <div class="card"><div class="icon">🔬</div><h4>退化分析</h4><p>7-mode NNLS 分解，堆叠面积图 + 饼图</p></div>
+    <div class="card"><div class="icon">📐</div><h4>DOE 分析</h4><p>6 标签页仪表盘：总览/因子/层级/热力图/Sankey/箱线图</p></div>
+    <div class="card"><div class="icon">🔍</div><h4>历史检索</h4><p>3D 向量相似度搜索，设计/性能/退化三维度</p></div>
+    <div class="card"><div class="icon">📝</div><h4>结论管理</h4><p>结论 CRUD、状态流转、AI 验证、证据关联</p></div>
+    <div class="card"><div class="icon">📄</div><h4>报告生成</h4><p>MD/HTML/PDF 格式，嵌入图表的完整分析报告</p></div>
+    <div class="card"><div class="icon">💬</div><h4>AI 聊天</h4><p>LLM 对话 + 工具调用 + 长期记忆 + 会话管理</p></div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 15: Testing ============ -->
+<section>
+  <h2>测试与质量保证</h2>
+  <div class="stat-row">
+    <div class="stat"><div class="value">142</div><div class="label">测试用例</div></div>
+    <div class="stat"><div class="value">100%</div><div class="label">通过率</div></div>
+    <div class="stat"><div class="value">7</div><div class="label">测试文件</div></div>
+    <div class="stat"><div class="value">0</div><div class="label">已知缺陷</div></div>
+  </div>
+  <div class="two-col" style="margin-top:24px">
+    <div>
+      <h3 style="font-size:0.85em">测试覆盖范围</h3>
+      <ul class="small">
+        <li><strong>数据加载</strong> — 各格式 loader、单位转换、异常处理</li>
+        <li><strong>数据转换</strong> — 周期摘要计算、容量保持率</li>
+        <li><strong>退化分解</strong> — NNLS 求解、7 模式权重验证</li>
+        <li><strong>DOE 分析</strong> — 覆盖率计算、因子影响分析</li>
+        <li><strong>搜索引擎</strong> — 向量化、余弦相似度、搜索模式</li>
+        <li><strong>结论管理</strong> — CRUD、状态流转、验证</li>
+        <li><strong>聊天系统</strong> — 内存 CRUD、会话管理、记忆提取</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="font-size:0.85em">质量实践</h3>
+      <div class="highlight-box">
+        <h4>测试即文档</h4>
+        <p>每个核心模块都有对应的测试文件 (<code>test_week1~4.py</code>, <code>test_chat.py</code>)，测试名即功能说明</p>
+      </div>
+      <div class="highlight-box" style="margin-top:8px">
+        <h4>持续验证</h4>
+        <p>每次改动后运行全量测试 <code>pytest tests/ -x</code>，确保回归问题为零</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 16: Development Timeline ============ -->
+<section>
+  <h2>开发里程碑</h2>
+  <div class="timeline">
+    <div class="phase">
+      <div class="week">Week 1</div>
+      <div class="dot"></div>
+      <div class="title">基础架构</div>
+      <div class="desc">数据模型<br>SQLite 持久化<br>多格式 Loader<br>周期摘要</div>
+    </div>
+    <div class="phase">
+      <div class="week">Week 2</div>
+      <div class="dot" style="background:var(--purple);box-shadow:0 0 0 2px var(--purple)"></div>
+      <div class="title">分析引擎</div>
+      <div class="desc">多实验对比<br>Overlay / Delta-V<br>NNLS 退化分解<br>报告生成</div>
+    </div>
+    <div class="phase">
+      <div class="week">Week 3</div>
+      <div class="dot" style="background:var(--green);box-shadow:0 0 0 2px var(--green)"></div>
+      <div class="title">智能分析</div>
+      <div class="desc">DOE 覆盖分析<br>3D 向量搜索<br>结论管理<br>结论验证</div>
+    </div>
+    <div class="phase">
+      <div class="week">Week 4</div>
+      <div class="dot" style="background:var(--orange);box-shadow:0 0 0 2px var(--orange)"></div>
+      <div class="title">Agent 集成</div>
+      <div class="desc">LLM 工具调用<br>智能加载<br>AI 聊天<br>模板解析</div>
+    </div>
+  </div>
+  <div class="stat-row" style="margin-top:40px">
+    <div class="stat"><div class="value">4</div><div class="label">迭代周期</div></div>
+    <div class="stat"><div class="value">~8k</div><div class="label">代码行数</div></div>
+    <div class="stat"><div class="value">21</div><div class="label">源文件</div></div>
+    <div class="stat"><div class="value">7</div><div class="label">测试文件</div></div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 17: Key Highlights ============ -->
+<section>
+  <h2>技术亮点总结</h2>
+  <div class="cards">
+    <div class="card" style="border-color:var(--blue)">
+      <div class="icon">🧠</div>
+      <h4 style="color:var(--blue)">LLM Agent 架构</h4>
+      <p>19 个工具 + 双后端 (LiteLLM / Claude SDK)，自然语言驱动全流程分析。Provider Router 支持 5 家 LLM 提供商无缝切换</p>
+    </div>
+    <div class="card" style="border-color:var(--purple)">
+      <div class="icon">🔬</div>
+      <h4 style="color:var(--purple)">7-Mode NNLS 分解</h4>
+      <p>将电压变化分解为 7 种物理退化机制，量化各模式贡献。从数据直接到物理洞察</p>
+    </div>
+    <div class="card" style="border-color:var(--green)">
+      <div class="icon">🔍</div>
+      <h4 style="color:var(--green)">3D 向量搜索引擎</h4>
+      <p>设计 + 性能 + 退化三维特征向量，余弦相似度检索历史实验。相似/对比双模式</p>
+    </div>
+    <div class="card" style="border-color:var(--orange)">
+      <div class="icon">📐</div>
+      <h4 style="color:var(--orange)">26 因子 DOE 分析</h4>
+      <p>自动检测 26 个 DOE 因子，覆盖率分析 + Sankey 图 + 缺失组合推荐，系统化实验设计</p>
+    </div>
+    <div class="card" style="border-color:var(--cyan)">
+      <div class="icon">💬</div>
+      <h4 style="color:var(--cyan)">智能聊天 + 长期记忆</h4>
+      <p>LLM 对话自动判断是否需要工具调用，SQLite 持久化长期记忆，记住用户偏好与研究背景</p>
+    </div>
+    <div class="card" style="border-color:var(--pink)">
+      <div class="icon">📝</div>
+      <h4 style="color:var(--pink)">结论闭环验证</h4>
+      <p>5 状态生命周期 + AI 自动验证，构建可积累、可追溯、可进化的实验知识库</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SLIDE 18: Q&A ============ -->
+<section data-transition="fade">
+  <h1><span class="gradient-text">Q & A</span></h1>
+  <p style="color:var(--gray);font-size:0.7em;margin-top:40px">
+    LMBAgent &mdash; Lithium Metal Battery Data Analysis Agent
+  </p>
+  <div style="margin-top:30px">
+    <span class="badge badge-blue">GitHub</span>
+    <span class="badge badge-purple">Python 3.14</span>
+    <span class="badge badge-green">Streamlit</span>
+    <span class="badge badge-orange">MiniMax M2.7</span>
+    <span class="badge badge-cyan">142 Tests</span>
+  </div>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+Reveal.initialize({
+  hash: true,
+  history: true,
+  transition: 'slide',
+  transitionSpeed: 'default',
+  backgroundTransition: 'fade',
+  progress: true,
+  controls: true,
+  center: true,
+  width: 1200,
+  height: 700,
+  margin: 0.04,
+  slideNumber: 'c/t',
+  keyboard: true,
+  overview: true,
+});
+</script>
+
+</body>
+</html>
