@@ -452,8 +452,8 @@ S₇: Electrolyte Loss (电解液耗竭)
         <li><strong>逐圈演化</strong> — 跟踪退化模式随循环的演变趋势</li>
         <li><strong>可视化</strong> — 堆叠面积图 + 模式贡献饼图</li>
       </ul>
-      <div class="screenshot" style="margin-top:12px">
-        📊 退化分解可视化 — 堆叠面积图展示 7 模式贡献
+      <div style="margin-top:12px">
+        <img src="img/degradation.png" style="width:100%;border-radius:8px;border:1px solid var(--border)">
       </div>
     </div>
   </div>
@@ -492,8 +492,8 @@ S₇: Electrolyte Loss (电解液耗竭)
         <li><strong>衰减影响</strong> — Sankey 图（因子→衰减率）</li>
         <li><strong>因子影响</strong> — 箱线图 + 柱状图</li>
       </ul>
-      <div class="screenshot">
-        📊 DOE 仪表盘 — Sankey + Heatmap + Sunburst
+      <div style="margin-top:12px">
+        <img src="img/doe_coverage.png" style="width:100%;border-radius:8px;border:1px solid var(--border)">
       </div>
     </div>
   </div>
@@ -519,8 +519,8 @@ S₇: Electrolyte Loss (电解液耗竭)
       <p>自动生成跨实验对比表：容量保持率、库仑效率、阻抗、衰减率、设计因子差异</p>
     </div>
   </div>
-  <div class="screenshot" style="margin-top:16px">
-    📊 多实验对比页面 — Overlay + Metrics Table + Delta-V
+  <div style="margin-top:16px">
+    <img src="img/delta_v.png" style="width:100%;border-radius:8px;border:1px solid var(--border)">
   </div>
 </section>
 
@@ -613,19 +613,9 @@ S₇: Electrolyte Loss (电解液耗竭)
       </div>
     </div>
     <div>
-      <h3 style="font-size:0.85em">工作流程</h3>
-      <pre><code>用户输入
-  ↓
-构建 System Prompt
-  (工具描述 + 长期记忆 + 数据上下文)
-  ↓
-LLM 判断 → 直接回答 OR 调用工具
-  ↓                       ↓
-返回文本          执行工具 → 结果反馈 LLM
-  ↓                       ↓
-提取长期记忆 ← ← ← ← ← 生成最终回复
-  ↓
-保存到 SQLite</code></pre>
+      <div style="margin-top:12px">
+        <img src="img/chat_mockup.png" style="width:100%;border-radius:8px;border:1px solid var(--border)">
+      </div>
     </div>
   </div>
 </section>
@@ -663,6 +653,9 @@ LLM 判断 → 直接回答 OR 调用工具
         <li>阻抗分析</li>
         <li>可视化图表（容量衰减/CE/电压曲线/内阻）</li>
       </ul>
+      <div style="margin-top:12px">
+        <img src="img/report_preview.png" style="width:100%;border-radius:8px;border:1px solid var(--border)">
+      </div>
     </div>
   </div>
 </section>
@@ -700,7 +693,7 @@ LLM 判断 → 直接回答 OR 调用工具
 
 <!-- ============ SLIDE 14: Web UI Overview ============ -->
 <section>
-  <h2>Web UI 概览 — 10 个页面</h2>
+  <h2>Web UI 概览 — 10 + 1 个功能模块</h2>
   <div class="cards">
     <div class="card"><div class="icon">📤</div><h4>上传数据</h4><p>单文件/批量/目录扫描/AI探索/AI智能加载 5 个标签页</p></div>
     <div class="card"><div class="icon">📊</div><h4>数据集管理</h4><p>数据集列表、详情查看、设计元数据展示</p></div>
@@ -712,6 +705,26 @@ LLM 判断 → 直接回答 OR 调用工具
     <div class="card"><div class="icon">📝</div><h4>结论管理</h4><p>结论 CRUD、状态流转、AI 验证、证据关联</p></div>
     <div class="card"><div class="icon">📄</div><h4>报告生成</h4><p>MD/HTML/PDF 格式，嵌入图表的完整分析报告</p></div>
     <div class="card"><div class="icon">💬</div><h4>AI 聊天</h4><p>LLM 对话 + 工具调用 + 长期记忆 + 会话管理</p></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+    <div class="card" style="border-color:var(--purple);background:linear-gradient(135deg,rgba(96,165,250,0.05),rgba(167,139,250,0.08));text-align:center">
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px">
+        <div style="font-size:1.8em">🔎</div>
+        <div style="text-align:left">
+          <h4 style="color:var(--purple);margin:0">Deep Research Agent</h4>
+          <p style="margin:4px 0 0;font-size:0.7em">深度研究智能体 — 多轮自主检索、文献分析、实验方案推演</p>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="border-color:var(--cyan);background:linear-gradient(135deg,rgba(34,211,238,0.05),rgba(74,222,128,0.08));text-align:center">
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px">
+        <div style="font-size:1.8em">📊</div>
+        <div style="text-align:left">
+          <h4 style="color:var(--cyan);margin:0">项目汇报演示</h4>
+          <p style="margin:4px 0 0;font-size:0.7em">本演示文稿 — reveal.js 全屏幻灯片，支持键盘翻页与概览模式</p>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -739,6 +752,9 @@ LLM 判断 → 直接回答 OR 调用工具
     </div>
     <div>
       <h3 style="font-size:0.85em">质量实践</h3>
+      <div style="margin-bottom:12px">
+        <img src="img/test_coverage.png" style="width:100%;border-radius:8px;border:1px solid var(--border)">
+      </div>
       <div class="highlight-box">
         <h4>测试即文档</h4>
         <p>每个核心模块都有对应的测试文件 (<code>test_week1~4.py</code>, <code>test_chat.py</code>)，测试名即功能说明</p>
@@ -832,7 +848,6 @@ LLM 判断 → 直接回答 OR 调用工具
     LMBAgent &mdash; Lithium Metal Battery Data Analysis Agent
   </p>
   <div style="margin-top:30px">
-    <span class="badge badge-blue">GitHub</span>
     <span class="badge badge-purple">Python 3.14</span>
     <span class="badge badge-green">Streamlit</span>
     <span class="badge badge-orange">MiniMax M2.7</span>
