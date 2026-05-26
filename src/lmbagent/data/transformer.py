@@ -76,6 +76,74 @@ def add_cycle_summary(dataset: BatteryDataset) -> BatteryDataset:
     return dataset
 
 
+def split_by_cycles(
+    dataset: BatteryDataset,
+    max_cycles_per_dataset: int = 1,
+) -> list[BatteryDataset]:
+    """Split a BatteryDataset into multiple datasets by independent cycle groups.
+
+    Args:
+        dataset: Source dataset with all cycles.
+        max_cycles_per_dataset: Max cycles per split dataset.
+            1 = each cycle becomes its own dataset.
+            N = groups of N cycles per dataset.
+            0 or negative = no splitting (returns [dataset]).
+
+    Returns:
+        List of BatteryDataset, one per cycle group.
+    """
+    if max_cycles_per_dataset <= 0:
+        return [dataset]
+
+    df = dataset.raw_data
+    if df.empty or "cycle_index" not in df.columns:
+        return [dataset]
+
+    unique_cycles = sorted(df["cycle_index"].unique())
+    if len(unique_cycles) <= max_cycles_per_dataset:
+        return [dataset]
+
+    import math
+    n_groups = math.ceil(len(unique_cycles) / max_cycles_per_dataset)
+    results = []
+
+    for g in range(n_groups):
+        start = g * max_cycles_per_dataset
+        end = min(start + max_cycles_per_dataset, len(unique_cycles))
+        group_cycles = unique_cycles[start:end]
+
+        mask = df["cycle_index"].isin(group_cycles)
+        sub_df = df[mask].copy()
+
+        if sub_df.empty:
+            continue
+
+        sub_df["data_point"] = range(len(sub_df))
+
+        suffix = f"_c{group_cycles[0]}-{group_cycles[-1]}" if len(group_cycles) > 1 else f"_c{group_cycles[0]}"
+        sub_id = dataset.data_id + suffix
+
+        sub_ds = BatteryDataset(
+            data_id=sub_id,
+            source_file=dataset.source_file,
+            cell_id=dataset.cell_id,
+            test_name=dataset.test_name,
+            start_datetime=dataset.start_datetime,
+            raw_data=sub_df,
+            metadata={
+                **(dataset.metadata or {}),
+                "split_from": dataset.data_id,
+                "cycle_range": [int(group_cycles[0]), int(group_cycles[-1])],
+                "num_cycles_in_group": len(group_cycles),
+            },
+            experiment_design=dataset.experiment_design,
+        )
+        sub_ds = add_cycle_summary(sub_ds)
+        results.append(sub_ds)
+
+    return results
+
+
 def compute_insights(dataset: BatteryDataset) -> dict:
     """Compute cross-cycle analytical insights from dataset.
 

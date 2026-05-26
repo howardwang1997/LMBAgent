@@ -8,7 +8,6 @@ them into the DataStore.
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -17,7 +16,7 @@ from lmbagent.data.loader import detect_format, load_auto
 from lmbagent.data.models import BatteryDataset
 from lmbagent.data.schema import ExperimentDesign, find_design_file, load_experiment_design
 from lmbagent.data.store import DataStore
-from lmbagent.data.transformer import add_cycle_summary
+from lmbagent.data.transformer import add_cycle_summary, split_by_cycles
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +97,7 @@ def batch_import(
     candidates: list[ExperimentCandidate],
     store: DataStore | None = None,
     skip_errors: bool = True,
+    split_n: int = 0,
 ) -> list[ExperimentCandidate]:
     """Import a list of experiment candidates into the DataStore.
 
@@ -105,6 +105,7 @@ def batch_import(
         candidates: List of ExperimentCandidate from scan_directory.
         store: DataStore instance (uses singleton if None).
         skip_errors: If True, continue on errors. If False, raise on first error.
+        split_n: If > 0, split datasets with more than split_n cycles into groups.
 
     Returns:
         Updated candidates with import status.
@@ -119,11 +120,22 @@ def batch_import(
             ds = load_auto(candidate.path)
             if candidate.design and ds.experiment_design is None:
                 ds.experiment_design = candidate.design
-            ds = add_cycle_summary(ds)
-            store.put(ds)
+
+            if split_n > 0 and ds.num_cycles > split_n:
+                sub_datasets = split_by_cycles(ds, max_cycles_per_dataset=split_n)
+                for sub_ds in sub_datasets:
+                    if candidate.design and sub_ds.experiment_design is None:
+                        sub_ds.experiment_design = candidate.design
+                    sub_ds = add_cycle_summary(sub_ds)
+                    store.put(sub_ds)
+                candidate.data_id = ds.data_id
+            else:
+                ds = add_cycle_summary(ds)
+                store.put(ds)
+                candidate.data_id = ds.data_id
+
             candidate.imported = True
-            candidate.data_id = ds.data_id
-            logger.info(f"Imported {candidate.path.name} as {ds.data_id}")
+            logger.info(f"Imported {candidate.path.name} as {candidate.data_id}")
         except Exception as e:
             candidate.error = str(e)
             logger.error(f"Failed to import {candidate.path}: {e}")
@@ -169,6 +181,13 @@ def smart_scan_directory(root: str | Path) -> dict:
           'groups': dict of group_name -> list of file paths
           'tree': directory tree as string
     """
+    import json
+    import re
+
+    import requests
+
+    from lmbagent.config import get_model_config, DEFAULT_MODEL
+
     root = Path(root)
     candidates = scan_directory(root)
     tree_str = _build_tree_string(root, max_depth=3)
@@ -212,34 +231,37 @@ Respond in JSON:
 
 Return ONLY the JSON object."""
 
-    os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
-    os.environ.setdefault("LITELLM_MODE", "PRODUCTION")
-
-    import json
-    import litellm
-    from lmbagent.config import get_model_config, DEFAULT_MODEL
-
     config = get_model_config(DEFAULT_MODEL)
-    litellm_model = f"openai/{DEFAULT_MODEL}" if config["provider"] == "HKRI" else DEFAULT_MODEL
-
-    completion_kwargs = {
-        "model": litellm_model,
-        "messages": [
-            {"role": "system", "content": "You are a battery experiment data management expert. Analyze directory structures and return valid JSON."},
-            {"role": "user", "content": prompt},
-        ],
-        "api_key": config.get("api_key"),
-        "temperature": 0.1,
-        "timeout": 30,
-    }
-    if config.get("base_url"):
-        completion_kwargs["api_base"] = config["base_url"]
+    base_url = config.get("base_url", "").rstrip("/")
+    api_key = config.get("api_key")
 
     try:
-        response = litellm.completion(**completion_kwargs)
-        text = response.choices[0].message.content.strip()
-        if text.startswith("```"):
-            text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        resp = requests.post(
+            f"{base_url}/chat/completions",
+            json={
+                "model": DEFAULT_MODEL,
+                "messages": [
+                    {"role": "system", "content": "You are a battery experiment data management expert. Analyze directory structures and return valid JSON."},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.1,
+                "max_tokens": 1024,
+            },
+            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        text = resp.json()["choices"][0]["message"]["content"].strip()
+
+        if "```json" in text:
+            text = text.split("```json", 1)[1].split("```", 1)[0].strip()
+        elif "```" in text:
+            text = text.split("```", 1)[1].split("```", 1)[0].strip()
+            if text.startswith("json"):
+                text = text[4:].strip()
+        elif "{" in text:
+            text = text[text.index("{"):text.rindex("}") + 1]
+
         result = json.loads(text)
     except Exception as e:
         logger.warning(f"LLM directory analysis failed: {e}")

@@ -16,14 +16,12 @@ def _make_csv(path: Path, rows: list[dict], columns: list[str] | None = None):
     return path
 
 
-def _mock_llm_response(analysis_dict: dict):
-    """Create a mock litellm.completion that returns the given analysis dict."""
-    msg = MagicMock()
-    msg.content = json.dumps(analysis_dict, ensure_ascii=False)
-    choice = MagicMock()
-    choice.message = msg
+def _mock_requests_response(analysis_dict: dict):
+    msg = {"content": json.dumps(analysis_dict, ensure_ascii=False)}
+    choice = {"message": msg}
     resp = MagicMock()
-    resp.choices = [choice]
+    resp.json.return_value = {"choices": [choice]}
+    resp.raise_for_status = MagicMock()
     return resp
 
 
@@ -53,8 +51,8 @@ def test_corrective_load_csv_with_user_feedback(tmp_path):
         "reasoning": "User corrected column names",
     }
 
-    with patch("lmbagent.data.llm_loader.litellm") as mock_litellm:
-        mock_litellm.completion.return_value = _mock_llm_response(analysis)
+    with patch("lmbagent.data.llm_loader.requests") as mock_requests:
+        mock_requests.post.return_value = _mock_requests_response(analysis)
         from lmbagent.data.llm_loader import corrective_load
 
         ds, result_analysis = corrective_load(
@@ -82,7 +80,6 @@ def test_corrective_load_multiturn(tmp_path):
         ],
     )
 
-    # First turn: wrong analysis
     analysis_1 = {
         "format": "generic_csv",
         "separator": ",",
@@ -93,8 +90,8 @@ def test_corrective_load_multiturn(tmp_path):
         "reasoning": "Could not identify columns",
     }
 
-    with patch("lmbagent.data.llm_loader.litellm") as mock_litellm:
-        mock_litellm.completion.return_value = _mock_llm_response(analysis_1)
+    with patch("lmbagent.data.llm_loader.requests") as mock_requests:
+        mock_requests.post.return_value = _mock_requests_response(analysis_1)
         from lmbagent.data.llm_loader import corrective_load
 
         ds1, analysis_result_1 = corrective_load(
@@ -102,7 +99,6 @@ def test_corrective_load_multiturn(tmp_path):
             user_feedback="First attempt",
         )
 
-    # Second turn: user corrects
     analysis_2 = {
         "format": "generic_csv",
         "separator": ",",
@@ -118,8 +114,8 @@ def test_corrective_load_multiturn(tmp_path):
         "reasoning": "User corrected: X=cycle, Y=voltage, Z=current, W=capacity",
     }
 
-    with patch("lmbagent.data.llm_loader.litellm") as mock_litellm:
-        mock_litellm.completion.return_value = _mock_llm_response(analysis_2)
+    with patch("lmbagent.data.llm_loader.requests") as mock_requests:
+        mock_requests.post.return_value = _mock_requests_response(analysis_2)
         from lmbagent.data.llm_loader import corrective_load
 
         ds2, analysis_result_2 = corrective_load(
@@ -168,8 +164,8 @@ def test_corrective_load_with_previous_analysis(tmp_path):
         "reasoning": "Full correction based on user feedback",
     }
 
-    with patch("lmbagent.data.llm_loader.litellm") as mock_litellm:
-        mock_litellm.completion.return_value = _mock_llm_response(analysis)
+    with patch("lmbagent.data.llm_loader.requests") as mock_requests:
+        mock_requests.post.return_value = _mock_requests_response(analysis)
         from lmbagent.data.llm_loader import corrective_load
 
         ds, result = corrective_load(
@@ -191,8 +187,8 @@ def test_corrective_load_llm_failure_falls_back(tmp_path):
         ],
     )
 
-    with patch("lmbagent.data.llm_loader.litellm") as mock_litellm:
-        mock_litellm.completion.side_effect = Exception("LLM unavailable")
+    with patch("lmbagent.data.llm_loader.requests") as mock_requests:
+        mock_requests.post.side_effect = Exception("LLM unavailable")
         from lmbagent.data.llm_loader import corrective_load
 
         ds, result = corrective_load(
@@ -200,6 +196,5 @@ def test_corrective_load_llm_failure_falls_back(tmp_path):
             user_feedback="standard arbin format",
         )
 
-    # LLM failed but should still produce an analysis dict
     assert result is not None
     assert "reasoning" in result

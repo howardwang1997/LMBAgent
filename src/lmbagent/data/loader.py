@@ -300,62 +300,61 @@ def load_neware_xlsx(
     sheet_name: str | None = None,
     data_id: str | None = None,
 ) -> BatteryDataset:
-    """Load a Neware or battery test Excel (.xlsx) file.
-
-    Supports multiple formats:
-      - Format A: sheets unit/test/cycle/step/record (Chinese headers, NEWAREA)
-      - Format B: sheets Info/Cycle_*/Statis_*/Detail_* (mixed headers, NEWAREB)
-      - Format C: report format with CD_Capacity_Data/C&D_Data sheets (TVC)
-      - Any other format with detectable V/I/capacity columns
-    """
-    import openpyxl
-
     file_path = Path(file_path)
     if not file_path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
 
-    wb = openpyxl.load_workbook(str(file_path), data_only=True)
+    import pandas as pd
 
-    # Check for TVC report format (CD_Capacity_Data or C&D_Data sheets)
-    tvc_sheets = [s for s in wb.sheetnames if s in ("CD_Capacity_Data", "C&D_Data")]
+    try:
+        engine = "calamine"
+        pd.read_excel(str(file_path), sheet_name=0, engine=engine, nrows=1)
+    except Exception:
+        engine = "openpyxl"
+
+    xls = pd.ExcelFile(str(file_path), engine=engine)
+    sheet_names = xls.sheet_names
+
+    tvc_sheets = [s for s in sheet_names if s in ("CD_Capacity_Data", "C&D_Data")]
     if tvc_sheets:
+        import openpyxl
+        wb = openpyxl.load_workbook(str(file_path), data_only=True)
         result = _load_tvc_report(wb, file_path, data_id)
         wb.close()
         return result
 
-    # Auto-detect the detail/record sheet
-    detail_sheet = _find_neware_detail_sheet(wb, sheet_name)
-    if detail_sheet is None:
-        wb.close()
-        raise ValueError(f"Could not find a data sheet in {file_path.name}. Sheets: {wb.sheetnames}")
+    detail_sheet_name = _find_neware_detail_sheet_name(sheet_names, sheet_name)
+    if detail_sheet_name is None:
+        data_sheets = _find_all_data_sheet_names(xls, sheet_names, engine)
+        if not data_sheets:
+            raise ValueError(f"Could not find a data sheet in {file_path.name}. Sheets: {sheet_names}")
+        detail_sheet_name = data_sheets[0]
+        if len(data_sheets) > 1:
+            return _load_multi_sheet_xlsx(xls, data_sheets, file_path, data_id)
 
-    rows = list(detail_sheet.iter_rows(values_only=True))
-    wb.close()
+    df_raw = pd.read_excel(xls, sheet_name=detail_sheet_name)
+    xls.close()
 
-    if len(rows) < 2:
+    if len(df_raw) < 1:
         raise ValueError(f"Sheet has insufficient data (< 2 rows)")
 
-    header = [str(v).strip() if v is not None else "" for v in rows[0]]
+    header = [str(v).strip() for v in df_raw.columns]
 
-    # Try to match columns using the expanded map (exact then substring)
     col_idx: dict[str, int] = {}
     for col_name, key in NEWARE_XLSX_COLUMN_MAP.items():
         if key in col_idx:
             continue
-        # Exact match first
         try:
             idx = header.index(col_name)
             col_idx[key] = idx
             continue
         except ValueError:
             pass
-        # Substring match: header contains the map key
         for i, h in enumerate(header):
             if col_name in h and key not in col_idx:
                 col_idx[key] = i
                 break
 
-    # If standard map didn't find enough, try fuzzy matching
     if "voltage" not in col_idx or "current" not in col_idx:
         col_idx = _fuzzy_match_columns(header)
 
@@ -364,100 +363,232 @@ def load_neware_xlsx(
         if col not in col_idx:
             raise ValueError(f"Required column '{col}' not found. Header: {header}")
 
-    has_time = "test_time" in col_idx or "step_time" in col_idx
+    has_cycle = "cycle_index" in col_idx
+    has_step = "step_index" in col_idx
+    has_test_time = "test_time" in col_idx
+    has_step_time = "step_time" in col_idx
     has_capacity = "capacity" in col_idx
     has_explicit_charge = "charge_capacity" in col_idx
     has_explicit_discharge = "discharge_capacity" in col_idx
     has_energy = "energy" in col_idx
-    has_cycle = "cycle_index" in col_idx
+    has_charge_energy = "charge_energy" in col_idx
+    has_discharge_energy = "discharge_energy" in col_idx
 
-    data_lists: dict[str, list] = {
-        "voltage": [], "current": [], "cycle_index": [], "step_index": [],
-        "test_time": [],
-        "charge_capacity": [], "discharge_capacity": [],
-        "charge_energy": [], "discharge_energy": [],
-    }
+    raw_vals = df_raw.values
+    n_rows = len(raw_vals)
 
-    for row in rows[1:]:
-        if row is None:
+    import numpy as np
+
+    voltage = np.array([float(v) if v is not None else np.nan for v in raw_vals[:, col_idx["voltage"]]])
+    current = np.array([float(v) if v is not None else np.nan for v in raw_vals[:, col_idx["current"]]])
+
+    mask = ~(np.isnan(voltage) | np.isnan(current))
+
+    cycle = np.zeros(n_rows, dtype=np.int32)
+    if has_cycle:
+        cv = raw_vals[:, col_idx["cycle_index"]]
+        for i in range(n_rows):
+            cycle[i] = int(cv[i]) if cv[i] is not None else 0
+
+    step = np.zeros(n_rows, dtype=np.int32)
+    if has_step:
+        sv = raw_vals[:, col_idx["step_index"]]
+        for i in range(n_rows):
+            step[i] = int(sv[i]) if sv[i] is not None else 0
+
+    test_time = np.zeros(n_rows, dtype=np.float64)
+    if has_test_time:
+        tc = col_idx["test_time"]
+        for i in range(n_rows):
+            v = raw_vals[i, tc] if tc < raw_vals.shape[1] else None
+            if v is not None:
+                test_time[i] = _parse_neware_time_to_seconds(v)
+    elif has_step_time:
+        tc = col_idx["step_time"]
+        for i in range(n_rows):
+            v = raw_vals[i, tc] if tc < raw_vals.shape[1] else None
+            if v is not None:
+                test_time[i] = _parse_neware_time_to_seconds(v)
+
+    charge_cap = np.zeros(n_rows, dtype=np.float64)
+    discharge_cap = np.zeros(n_rows, dtype=np.float64)
+    if has_explicit_charge and has_explicit_discharge:
+        for i in range(n_rows):
+            ccv = raw_vals[i, col_idx["charge_capacity"]]
+            dcv = raw_vals[i, col_idx["discharge_capacity"]]
+            charge_cap[i] = float(ccv) if ccv is not None else 0.0
+            discharge_cap[i] = float(dcv) if dcv is not None else 0.0
+    elif has_capacity:
+        for i in range(n_rows):
+            cv = raw_vals[i, col_idx["capacity"]]
+            cap = float(cv) if cv is not None else 0.0
+            charge_cap[i] = cap if current[i] > 0 else 0.0
+            discharge_cap[i] = abs(cap) if current[i] < 0 else 0.0
+
+    charge_energy = np.zeros(n_rows, dtype=np.float64)
+    discharge_energy = np.zeros(n_rows, dtype=np.float64)
+    if has_charge_energy and has_discharge_energy:
+        for i in range(n_rows):
+            cev = raw_vals[i, col_idx["charge_energy"]]
+            dev = raw_vals[i, col_idx["discharge_energy"]]
+            charge_energy[i] = abs(float(cev)) if cev is not None else 0.0
+            discharge_energy[i] = abs(float(dev)) if dev is not None else 0.0
+    elif has_energy:
+        for i in range(n_rows):
+            ev = raw_vals[i, col_idx["energy"]]
+            energy = float(ev) if ev is not None else 0.0
+            charge_energy[i] = abs(energy) if current[i] > 0 else 0.0
+            discharge_energy[i] = abs(energy) if current[i] < 0 else 0.0
+
+    df = pd.DataFrame({
+        "data_point": np.arange(n_rows),
+        "voltage": voltage,
+        "current": current,
+        "cycle_index": cycle,
+        "step_index": step,
+        "test_time": test_time,
+        "charge_capacity": charge_cap,
+        "discharge_capacity": discharge_cap,
+        "charge_energy": charge_energy,
+        "discharge_energy": discharge_energy,
+    })[mask]
+
+    if data_id is None:
+        data_id = uuid.uuid4().hex[:8]
+
+    design = _try_load_design(file_path)
+
+    return BatteryDataset(
+        data_id=data_id,
+        source_file=str(file_path),
+        raw_data=df,
+        experiment_design=design,
+    )
+
+
+def _load_multi_sheet_xlsx(
+    xls,
+    data_sheets: list[str],
+    file_path: Path,
+    data_id: str | None = None,
+) -> BatteryDataset:
+    """Load and merge multiple data sheets from a single xlsx file.
+
+    Each sheet is processed independently with NEWARE_XLSX_COLUMN_MAP,
+    then concatenated with a sheet_name column.
+    """
+    import pandas as pd
+
+    all_dfs = []
+    for sn in data_sheets:
+        df_raw = pd.read_excel(xls, sheet_name=sn)
+        if len(df_raw) < 1:
             continue
-        try:
-            voltage_val = row[col_idx["voltage"]]
-            current_val = row[col_idx["current"]]
-            if voltage_val is None or current_val is None:
+
+        header = [str(v).strip() for v in df_raw.columns]
+
+        col_idx: dict[str, int] = {}
+        for col_name, key in NEWARE_XLSX_COLUMN_MAP.items():
+            if key in col_idx:
                 continue
+            try:
+                idx = header.index(col_name)
+                col_idx[key] = idx
+                continue
+            except ValueError:
+                pass
+            for i, h in enumerate(header):
+                if col_name in h and key not in col_idx:
+                    col_idx[key] = i
+                    break
 
-            voltage = float(voltage_val)
-            current = float(current_val)
+        if "voltage" not in col_idx or "current" not in col_idx:
+            col_idx = _fuzzy_match_columns(header)
 
-            cycle = 0
-            if has_cycle:
-                cv = row[col_idx["cycle_index"]]
-                cycle = int(cv) if cv is not None else 0
-
-            step = 0
-            if "step_index" in col_idx:
-                sv = row[col_idx["step_index"]]
-                step = int(sv) if sv is not None else 0
-
-            # Time handling
-            time_val = 0.0
-            if "test_time" in col_idx:
-                tc = col_idx["test_time"]
-                if tc < len(row) and row[tc] is not None:
-                    time_val = _parse_neware_time_to_seconds(row[tc])
-                test_time = time_val
-            elif "step_time" in col_idx:
-                tc = col_idx["step_time"]
-                if tc < len(row) and row[tc] is not None:
-                    time_val = _parse_neware_time_to_seconds(row[tc])
-                test_time = time_val
-            else:
-                test_time = 0.0
-
-            # Capacity handling
-            if has_explicit_charge and has_explicit_discharge:
-                ccv = row[col_idx["charge_capacity"]]
-                dcv = row[col_idx["discharge_capacity"]]
-                charge_cap = float(ccv) if ccv is not None else 0.0
-                discharge_cap = float(dcv) if dcv is not None else 0.0
-            elif has_capacity:
-                cv = row[col_idx["capacity"]]
-                cap = float(cv) if cv is not None else 0.0
-                charge_cap = cap if current > 0 else 0.0
-                discharge_cap = abs(cap) if current < 0 else 0.0
-            else:
-                charge_cap = 0.0
-                discharge_cap = 0.0
-
-            # Energy handling
-            if "charge_energy" in col_idx and "discharge_energy" in col_idx:
-                cev = row[col_idx["charge_energy"]]
-                dev = row[col_idx["discharge_energy"]]
-                charge_energy = abs(float(cev)) if cev is not None else 0.0
-                discharge_energy = abs(float(dev)) if dev is not None else 0.0
-            elif has_energy:
-                ev = row[col_idx["energy"]]
-                energy = float(ev) if ev is not None else 0.0
-                charge_energy = abs(energy) if current > 0 else 0.0
-                discharge_energy = abs(energy) if current < 0 else 0.0
-            else:
-                charge_energy = 0.0
-                discharge_energy = 0.0
-
-            data_lists["voltage"].append(voltage)
-            data_lists["current"].append(current)
-            data_lists["cycle_index"].append(cycle)
-            data_lists["step_index"].append(step)
-            data_lists["test_time"].append(test_time)
-            data_lists["charge_capacity"].append(charge_cap)
-            data_lists["discharge_capacity"].append(discharge_cap)
-            data_lists["charge_energy"].append(charge_energy)
-            data_lists["discharge_energy"].append(discharge_energy)
-        except (ValueError, TypeError, IndexError):
+        if "voltage" not in col_idx or "current" not in col_idx:
             continue
 
-    df = pd.DataFrame(data_lists)
+        raw_vals = df_raw.values
+        n_rows = len(raw_vals)
+
+        voltage = np.array([float(v) if v is not None else np.nan for v in raw_vals[:, col_idx["voltage"]]])
+        current = np.array([float(v) if v is not None else np.nan for v in raw_vals[:, col_idx["current"]]])
+        mask = ~(np.isnan(voltage) | np.isnan(current))
+
+        cycle = np.zeros(n_rows, dtype=np.int32)
+        if "cycle_index" in col_idx:
+            cv = raw_vals[:, col_idx["cycle_index"]]
+            for i in range(n_rows):
+                cycle[i] = int(cv[i]) if cv[i] is not None else 0
+
+        step = np.zeros(n_rows, dtype=np.int32)
+        if "step_index" in col_idx:
+            sv = raw_vals[:, col_idx["step_index"]]
+            for i in range(n_rows):
+                step[i] = int(sv[i]) if sv[i] is not None else 0
+
+        test_time = np.zeros(n_rows, dtype=np.float64)
+        if "test_time" in col_idx:
+            tc = col_idx["test_time"]
+            for i in range(n_rows):
+                v = raw_vals[i, tc] if tc < raw_vals.shape[1] else None
+                if v is not None:
+                    test_time[i] = _parse_neware_time_to_seconds(v)
+
+        charge_cap = np.zeros(n_rows, dtype=np.float64)
+        discharge_cap = np.zeros(n_rows, dtype=np.float64)
+        has_explicit_charge = "charge_capacity" in col_idx
+        has_explicit_discharge = "discharge_capacity" in col_idx
+        has_capacity = "capacity" in col_idx
+
+        if has_explicit_charge and has_explicit_discharge:
+            for i in range(n_rows):
+                ccv = raw_vals[i, col_idx["charge_capacity"]]
+                dcv = raw_vals[i, col_idx["discharge_capacity"]]
+                charge_cap[i] = float(ccv) if ccv is not None else 0.0
+                discharge_cap[i] = float(dcv) if dcv is not None else 0.0
+        elif has_capacity:
+            for i in range(n_rows):
+                cv = raw_vals[i, col_idx["capacity"]]
+                cap = float(cv) if cv is not None else 0.0
+                charge_cap[i] = cap if current[i] > 0 else 0.0
+                discharge_cap[i] = abs(cap) if current[i] < 0 else 0.0
+
+        charge_energy = np.zeros(n_rows, dtype=np.float64)
+        discharge_energy = np.zeros(n_rows, dtype=np.float64)
+        if "charge_energy" in col_idx and "discharge_energy" in col_idx:
+            for i in range(n_rows):
+                cev = raw_vals[i, col_idx["charge_energy"]]
+                dev = raw_vals[i, col_idx["discharge_energy"]]
+                charge_energy[i] = abs(float(cev)) if cev is not None else 0.0
+                discharge_energy[i] = abs(float(dev)) if dev is not None else 0.0
+        elif "energy" in col_idx:
+            for i in range(n_rows):
+                ev = raw_vals[i, col_idx["energy"]]
+                energy = float(ev) if ev is not None else 0.0
+                charge_energy[i] = abs(energy) if current[i] > 0 else 0.0
+                discharge_energy[i] = abs(energy) if current[i] < 0 else 0.0
+
+        sub_df = pd.DataFrame({
+            "voltage": voltage,
+            "current": current,
+            "cycle_index": cycle,
+            "step_index": step,
+            "test_time": test_time,
+            "charge_capacity": charge_cap,
+            "discharge_capacity": discharge_cap,
+            "charge_energy": charge_energy,
+            "discharge_energy": discharge_energy,
+            "sheet_name": sn,
+        })[mask]
+        all_dfs.append(sub_df)
+
+    xls.close()
+
+    if not all_dfs:
+        raise ValueError(f"No valid data found across sheets: {data_sheets}")
+
+    df = pd.concat(all_dfs, ignore_index=True)
     df.insert(0, "data_point", range(len(df)))
 
     if data_id is None:
@@ -471,6 +602,61 @@ def load_neware_xlsx(
         raw_data=df,
         experiment_design=design,
     )
+
+
+def _find_neware_detail_sheet_name(sheet_names: list[str], preferred: str | None = None) -> str | None:
+    if preferred and preferred in sheet_names:
+        return preferred
+    for name in ("record", "Record", "RECORD"):
+        if name in sheet_names:
+            return name
+    for name in sheet_names:
+        if name.lower().startswith("detail"):
+            return name
+    for name in ("data", "Data", "raw_data", "Raw_Data", "cycling", "Cycling"):
+        if name in sheet_names:
+            return name
+    return None
+
+
+def _find_all_data_sheet_names(
+    xls_or_path,
+    sheet_names: list[str],
+    engine: str = "openpyxl",
+) -> list[str]:
+    """Find all sheets that contain battery cycling data.
+
+    Uses header inspection to find sheets with voltage + current columns.
+    Returns list of sheet names sorted by row count (most data first).
+    """
+    import pandas as pd
+
+    KNOWN_SKIP = {"unit", "test", "cycle", "step", "log", "idle", "info",
+                  "summary", "statistic", "overview", "cycle_summary", "statis",
+                  "parameter", "template", "config", "setup"}
+
+    candidates = []
+    for sn in sheet_names:
+        if sn.lower() in KNOWN_SKIP:
+            continue
+        try:
+            df = pd.read_excel(xls_or_path, sheet_name=sn, nrows=5)
+            if len(df) < 2:
+                continue
+            header = [str(v).strip().lower() if v is not None else "" for v in df.columns]
+            has_voltage = any("volt" in h or "电压" in h for h in header)
+            has_current = any("curr" in h or "电流" in h or h == "i" for h in header)
+            if has_voltage and has_current:
+                full_df = pd.read_excel(xls_or_path, sheet_name=sn)
+                candidates.append((sn, len(full_df)))
+        except Exception:
+            continue
+
+    if not candidates:
+        return []
+
+    candidates.sort(key=lambda x: x[1], reverse=True)
+    return [sn for sn, _ in candidates]
 
 
 def _load_tvc_report(wb, file_path: Path, data_id: str | None) -> BatteryDataset:

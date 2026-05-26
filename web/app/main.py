@@ -129,7 +129,7 @@ with st.sidebar:
     )
 
     st.markdown(
-        '<a href="http://localhost:8090/presentation.html" target="_blank" '
+        '<a href="https://10.211.18.233/nb-755846ce0e46404ee8/codeserver/proxy/8090/presentation.html" target="_blank" '
         'style="display:inline-block;width:100%;padding:0.5rem 1rem;margin-top:8px;'
         'background:linear-gradient(135deg,#4ade80,#22d3ee);color:#0f172a;'
         'text-align:center;border-radius:8px;text-decoration:none;'
