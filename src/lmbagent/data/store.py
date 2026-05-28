@@ -114,10 +114,25 @@ class DataStore:
                 challenged_by_json TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS activity_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_domain TEXT,
+                action TEXT NOT NULL,
+                target TEXT,
+                detail TEXT,
+                created_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_experiments_chemistry
                 ON experiments(chemistry);
             CREATE INDEX IF NOT EXISTS idx_experiments_cell_id
                 ON experiments(cell_id);
+            CREATE INDEX IF NOT EXISTS idx_activity_log_user
+                ON activity_log(user_domain);
+            CREATE INDEX IF NOT EXISTS idx_activity_log_action
+                ON activity_log(action);
+            CREATE INDEX IF NOT EXISTS idx_activity_log_created
+                ON activity_log(created_at);
         """)
         self._conn.commit()
 
@@ -280,6 +295,44 @@ class DataStore:
                         row[f"design.{k}"] = v
             rows.append(row)
         return pd.DataFrame(rows)
+
+    def log_activity(
+        self,
+        action: str,
+        user_domain: str = "",
+        target: str = "",
+        detail: str | dict | None = None,
+    ) -> None:
+        if isinstance(detail, dict):
+            detail = json.dumps(detail, ensure_ascii=False)
+        self._conn.execute(
+            "INSERT INTO activity_log (user_domain, action, target, detail, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (user_domain, action, target, detail, datetime.now().isoformat()),
+        )
+        self._conn.commit()
+
+    def query_activity(
+        self,
+        user_domain: str | None = None,
+        action: str | None = None,
+        limit: int = 100,
+    ) -> list[dict]:
+        clauses: list[str] = []
+        params: list = []
+        if user_domain:
+            clauses.append("user_domain = ?")
+            params.append(user_domain)
+        if action:
+            clauses.append("action = ?")
+            params.append(action)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        params.append(limit)
+        rows = self._conn.execute(
+            f"SELECT * FROM activity_log{where} ORDER BY id DESC LIMIT ?",
+            params,
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     @classmethod
     def reset(cls) -> None:

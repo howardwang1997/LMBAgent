@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -22,11 +23,21 @@ from lmbagent.data.catalog import scan_directory, batch_import
 _EXPERIENCE_DIR = Path.home() / ".lmbagent" / "load_experiences"
 
 
+def _get_smb_creds() -> dict | None:
+    return st.session_state.get("smb_creds")
+
+
+def _current_user() -> str:
+    creds = _get_smb_creds()
+    if creds:
+        return creds.get("username", "")
+    return ""
+
+
 def render_upload_page():
     try:
         _render()
     except Exception as e:
-        import streamlit as st
         st.error(f"页面渲染出错: {e}")
 
 
@@ -50,6 +61,183 @@ def _render():
         _render_smart_explore(store)
 
 
+@st.dialog("SMB 网络登录")
+def _smb_login_dialog(server_default: str = "10.156.212.11"):
+    st.markdown("请输入域账号密码以访问 SMB 网络共享")
+    server = st.text_input("服务器地址", value=server_default, key="smb_dlg_server")
+    username = st.text_input(
+        "用户名",
+        placeholder="域\\用户名 或 user@domain.com",
+        key="smb_dlg_user",
+    )
+    password = st.text_input("密码", type="password", key="smb_dlg_pass")
+
+    if st.button("登录", type="primary", key="smb_dlg_login"):
+        if not username or not password:
+            st.error("请输入用户名和密码")
+            return
+        with st.spinner("验证中..."):
+            from lmbagent.data.smb_client import smb_login
+            ok = smb_login(server, username, password)
+        if ok:
+            st.session_state.smb_creds = {
+                "server": server,
+                "username": username,
+                "password": password,
+            }
+            user_for_log = username
+            store = DataStore()
+            store.log_activity("smb_login", user_for_log, target=server, detail={"success": True})
+            st.success("登录成功!")
+            st.rerun()
+        else:
+            store = DataStore()
+            store.log_activity("smb_login", username, target=server, detail={"success": False})
+            st.error("登录失败: 用户名或密码错误")
+
+
+def _ensure_smb_creds(server: str = "") -> bool:
+    creds = _get_smb_creds()
+    if creds:
+        return True
+    _smb_login_dialog(server_default=server or "10.156.212.11")
+    return False
+
+
+def _render_smb_browser(store: DataStore):
+    with st.expander("SMB 网络文件浏览器", expanded=False):
+        creds = _get_smb_creds()
+        if not creds:
+            if st.button("登录 SMB 网络", key="smb_browser_login"):
+                _smb_login_dialog()
+            return
+
+        st.caption(f"已登录: `{creds['username']}` @ `{creds['server']}`")
+
+        from lmbagent.data.smb_client import list_shares, list_dir
+
+        with st.spinner("加载共享列表..."):
+            try:
+                shares = list_shares(
+                    server=creds["server"],
+                    username=creds["username"],
+                    password=creds["password"],
+                )
+            except Exception as e:
+                st.error(f"连接失败: {e}")
+                if st.button("重新登录", key="smb_relogin"):
+                    st.session_state.pop("smb_creds", None)
+                    st.rerun()
+                return
+
+        share_names = [s["name"] for s in shares]
+        selected_share = st.selectbox("选择共享", share_names, key="smb_share_sel")
+
+        if not selected_share:
+            return
+
+        smb_nav_path = st.session_state.get("smb_nav_path", "")
+        c1, c2 = st.columns([1, 5])
+        with c1:
+            if st.button("上级目录", key="smb_up"):
+                parts = smb_nav_path.strip("/").split("/")
+                if len(parts) > 1:
+                    smb_nav_path = "/".join(parts[:-1])
+                else:
+                    smb_nav_path = ""
+                st.session_state.smb_nav_path = smb_nav_path
+        with c2:
+            st.text(f"当前路径: {selected_share}/{smb_nav_path}" if smb_nav_path else f"当前路径: {selected_share}/")
+
+        try:
+            entries = list_dir(
+                selected_share,
+                smb_nav_path,
+                server=creds["server"],
+                username=creds["username"],
+                password=creds["password"],
+            )
+        except Exception as e:
+            st.error(f"无法浏览: {e}")
+            return
+
+        store.log_activity(
+            "smb_browse",
+            _current_user(),
+            target=f"{creds['server']}/{selected_share}/{smb_nav_path}",
+        )
+
+        dirs = [e for e in entries if e["is_dir"]]
+        files = [e for e in entries if not e["is_dir"]]
+
+        if dirs:
+            dir_names = [d["name"] for d in dirs]
+            selected_dir = st.selectbox("进入目录", ["(不选择)"] + dir_names, key="smb_dir_sel")
+            if selected_dir != "(不选择)" and st.button("打开", key="smb_open_dir"):
+                new_path = f"{smb_nav_path}/{selected_dir}" if smb_nav_path else selected_dir
+                st.session_state.smb_nav_path = new_path
+                st.rerun()
+
+        if files:
+            data_ext = {".csv", ".xlsx", ".xls", ".txt", ".tsv", ".npy"}
+            data_files = [f for f in files if Path(f["name"]).suffix.lower() in data_ext]
+            other_files = [f for f in files if f not in data_files]
+
+            if data_files:
+                file_options = [
+                    f"{f['name']} ({f['size'] / 1024:.1f} KB)" for f in data_files
+                ]
+                selected_idx = st.selectbox(
+                    "选择数据文件",
+                    range(len(data_files)),
+                    format_func=lambda i: file_options[i],
+                    key="smb_file_sel",
+                )
+                if st.button("下载并加载此文件", type="primary", key="smb_download_btn"):
+                    selected_file = data_files[selected_idx]
+                    remote = f"{smb_nav_path}/{selected_file['name']}" if smb_nav_path else selected_file["name"]
+                    _smb_download_and_load(
+                        store, creds, selected_share, remote, selected_file["name"], selected_file["size"]
+                    )
+
+            if other_files:
+                with st.expander(f"其他文件 ({len(other_files)})"):
+                    for f in other_files:
+                        st.markdown(f"- `{f['name']}` ({f['size'] / 1024:.1f} KB)")
+        elif not dirs:
+            st.info("此目录为空")
+
+
+def _smb_download_and_load(store, creds, share, remote_path, file_name, file_size):
+    from lmbagent.data.smb_client import download_file as smb_download
+
+    with st.spinner(f"下载中 ({file_size / 1024 / 1024:.1f} MB)..."):
+        try:
+            local_path = smb_download(
+                share,
+                remote_path,
+                server=creds["server"],
+                username=creds["username"],
+                password=creds["password"],
+            )
+        except Exception as e:
+            st.error(f"下载失败: {e}")
+            return
+
+    store.log_activity(
+        "smb_download",
+        creds["username"],
+        target=f"{creds['server']}/{share}/{remote_path}",
+        detail={"size": file_size, "local": local_path},
+    )
+
+    st.success(f"下载完成: {local_path} ({os.path.getsize(local_path) / 1024:.1f} KB)")
+    st.session_state.smb_local_file = local_path
+    st.session_state.smb_file_name = file_name
+    st.session_state.smb_remote_display = f"\\\\{creds['server']}\\{share}\\{remote_path.replace('/', '\\')}"
+    st.rerun()
+
+
 def _render_ai_load(store: DataStore):
     st.subheader("AI 智能加载与校对")
     st.markdown("""
@@ -65,22 +253,55 @@ def _render_ai_load(store: DataStore):
         key="llm_upload",
     )
 
-    st.caption("大文件（> 20 MB）请使用下方路径加载")
-    llm_server_path = st.text_input(
-        "服务器文件路径",
-        placeholder="/path/to/your/data.csv",
+    path_input = st.text_input(
+        "服务器文件路径 或 SMB 路径",
+        placeholder="/path/to/data.csv 或 \\\\10.156.212.11\\share\\path\\file.xlsx",
         key="llm_server_path",
     )
+
+    _render_smb_browser(store)
+
+    smb_local = st.session_state.get("smb_local_file")
+    smb_fname = st.session_state.get("smb_file_name")
+    smb_display = st.session_state.get("smb_remote_display", "")
 
     llm_tmp_path = None
     llm_file_name = None
 
-    if llm_server_path and Path(llm_server_path).exists():
-        llm_tmp_path = Path(llm_server_path)
-        llm_file_name = llm_tmp_path.name
-        llm_file_size = llm_tmp_path.stat().st_size
-        st.write(f"**文件:** {llm_file_name} ({llm_file_size / 1024:.1f} KB)")
-    elif llm_file:
+    if path_input:
+        from lmbagent.data.smb_client import parse_unc_path
+        parsed = parse_unc_path(path_input)
+        if parsed:
+            smb_server, smb_share, smb_rel = parsed
+            if not _ensure_smb_creds(smb_server):
+                return
+            creds = _get_smb_creds()
+            fname = Path(smb_rel).name
+            with st.spinner(f"从 SMB 下载: {fname}..."):
+                try:
+                    from lmbagent.data.smb_client import download_file as smb_dl
+                    local = smb_dl(smb_share, smb_rel, server=creds["server"],
+                                   username=creds["username"], password=creds["password"])
+                    store.log_activity("smb_download", creds["username"],
+                                       target=path_input,
+                                       detail={"size": os.path.getsize(local)})
+                    llm_tmp_path = Path(local)
+                    llm_file_name = fname
+                    st.write(f"**SMB 文件:** {fname} ({llm_tmp_path.stat().st_size / 1024:.1f} KB)")
+                except Exception as e:
+                    st.error(f"SMB 下载失败: {e}")
+                    return
+        elif Path(path_input).exists():
+            llm_tmp_path = Path(path_input)
+            llm_file_name = llm_tmp_path.name
+            st.write(f"**文件:** {llm_file_name} ({llm_tmp_path.stat().st_size / 1024:.1f} KB)")
+
+    if smb_local and not llm_tmp_path:
+        llm_tmp_path = Path(smb_local)
+        llm_file_name = smb_fname
+        st.write(f"**SMB 文件:** {smb_display} ({llm_tmp_path.stat().st_size / 1024:.1f} KB)")
+
+    if llm_file:
         llm_tmp_dir = Path(tempfile.gettempdir()) / "lmbagent_llm"
         llm_tmp_dir.mkdir(parents=True, exist_ok=True)
         llm_tmp_path = llm_tmp_dir / llm_file.name
@@ -110,7 +331,6 @@ def _render_ai_load(store: DataStore):
         st.session_state.llm_dataset = None
         st.session_state.llm_file_key = llm_file_name
 
-    # --- Load experience selector ---
     saved_experiences = _list_experiences()
     if saved_experiences:
         exp_names = ["(无)"] + [e["name"] for e in saved_experiences]
@@ -122,7 +342,6 @@ def _render_ai_load(store: DataStore):
                     _apply_experience_and_load(llm_tmp_path, llm_data_id, e["analysis"])
                     break
 
-    # --- AI analyze button ---
     if st.button("AI 分析并加载", type="primary", key="llm_load_btn"):
         import time as _time
         from lmbagent.data.llm_loader import llm_analyze_file, llm_smart_load
@@ -153,24 +372,20 @@ def _render_ai_load(store: DataStore):
 
         st.rerun()
 
-    # --- Raw file preview ---
     with st.expander("原始文件预览", expanded=False):
         if st.button("加载预览", key="load_preview_btn"):
             _show_file_preview(llm_tmp_path)
         else:
             st.info("点击上方按钮加载文件预览")
 
-    # --- Data preview (always visible when dataset exists) ---
     ds_preview = st.session_state.llm_dataset
     if ds_preview is not None:
         _render_data_preview(ds_preview)
 
-    # --- Chat messages ---
     for msg in st.session_state.llm_messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    # --- Multi-turn correction chat ---
     if user_input := st.chat_input("输入校正指令，如: 第一列是循环号，容量需按电流正负拆分..."):
         st.session_state.llm_messages.append({"role": "user", "content": user_input})
 
@@ -217,7 +432,6 @@ def _render_ai_load(store: DataStore):
 
         st.rerun()
 
-    # --- Save to DB + Save experience ---
     if st.session_state.llm_dataset is not None:
         st.divider()
         c1, c2 = st.columns(2)
@@ -226,6 +440,16 @@ def _render_ai_load(store: DataStore):
                 ds = st.session_state.llm_dataset
                 ds = add_cycle_summary(ds)
                 store.put(ds)
+                store.log_activity(
+                    "data_import",
+                    _current_user(),
+                    target=ds.data_id,
+                    detail={
+                        "points": ds.num_data_points,
+                        "cycles": ds.num_cycles,
+                        "source": str(llm_tmp_path),
+                    },
+                )
                 st.session_state.active_dataset_id = ds.data_id
                 st.success(
                     f"已入库! ID: `{ds.data_id}`, "
@@ -345,8 +569,6 @@ def _render_data_preview(ds_preview):
                 st.markdown(f"**放电容量范围:** {cyc_nonzero.min():.4f} ~ {cyc_nonzero.max():.4f} Ah (非零值)")
 
 
-# --- Experience persistence ---
-
 def _save_experience(file_name: str, analysis: dict):
     _EXPERIENCE_DIR.mkdir(parents=True, exist_ok=True)
     exp = {
@@ -393,39 +615,78 @@ def _render_batch_upload(store: DataStore):
 
     if source == "服务器目录路径":
         batch_dir = st.text_input(
-            "输入服务器目录路径",
-            placeholder="/path/to/experiment/data",
+            "输入服务器目录路径 或 SMB 路径",
+            placeholder="/path/to/data 或 \\\\10.156.212.11\\share\\dir",
             key="batch_dir",
         )
 
-        if batch_dir and Path(batch_dir).is_dir():
-            extensions = {".csv", ".xlsx", ".npy", ".txt", ".xls", ".tsv"}
-            all_files = sorted(
-                p for p in Path(batch_dir).rglob("*")
-                if p.suffix.lower() in extensions and not p.name.startswith("~") and p.stat().st_size > 0
-            )
-
-            if all_files:
-                st.write(f"发现 {len(all_files)} 个数据文件:")
-                formats = {}
-                for f in all_files:
-                    fmt = "未知"
-                    try:
-                        fmt = detect_format(str(f))
-                    except Exception:
-                        pass
-                    formats[fmt] = formats.get(fmt, 0) + 1
-                st.markdown("**格式统计:** " + ", ".join(f"`{k}`: {v}" for k, v in formats.items()))
-                with st.expander("文件列表"):
+        if batch_dir:
+            from lmbagent.data.smb_client import parse_unc_path
+            parsed = parse_unc_path(batch_dir)
+            if parsed:
+                smb_server, smb_share, smb_rel = parsed
+                if not _ensure_smb_creds(smb_server):
+                    return
+                creds = _get_smb_creds()
+                if st.button("批量导入 SMB 目录", type="primary", key="batch_smb_import"):
+                    from lmbagent.data.smb_client import walk as smb_walk
+                    with st.spinner("扫描 SMB 目录..."):
+                        items = smb_walk(
+                            smb_share, smb_rel, max_depth=1,
+                            server=creds["server"],
+                            username=creds["username"],
+                            password=creds["password"],
+                        )
+                    data_ext = {".csv", ".xlsx", ".xls", ".txt", ".tsv", ".npy"}
+                    data_items = [i for i in items if not i["is_dir"]
+                                  and Path(i["name"]).suffix.lower() in data_ext]
+                    if not data_items:
+                        st.warning("SMB 目录下未发现数据文件")
+                        return
+                    st.write(f"发现 {len(data_items)} 个文件，开始下载...")
+                    from lmbagent.data.smb_client import download_file as smb_dl
+                    local_files = []
+                    prog = st.progress(0)
+                    for idx, item in enumerate(data_items):
+                        try:
+                            local = smb_dl(
+                                smb_share, item["path"],
+                                server=creds["server"],
+                                username=creds["username"],
+                                password=creds["password"],
+                            )
+                            local_files.append(Path(local))
+                        except Exception as e:
+                            st.warning(f"下载失败 {item['name']}: {e}")
+                        prog.progress((idx + 1) / len(data_items))
+                    if local_files:
+                        _do_batch_import(store, local_files, use_ai, split_n)
+            elif Path(batch_dir).is_dir():
+                extensions = {".csv", ".xlsx", ".npy", ".txt", ".xls", ".tsv"}
+                all_files = sorted(
+                    p for p in Path(batch_dir).rglob("*")
+                    if p.suffix.lower() in extensions and not p.name.startswith("~") and p.stat().st_size > 0
+                )
+                if all_files:
+                    st.write(f"发现 {len(all_files)} 个数据文件:")
+                    formats = {}
                     for f in all_files:
-                        st.markdown(f"- `{f.name}` ({f.stat().st_size / 1024:.1f} KB)")
-
-                if st.button("批量导入", type="primary", key="batch_dir_import"):
-                    _do_batch_import(store, all_files, use_ai, split_n)
+                        fmt = "未知"
+                        try:
+                            fmt = detect_format(str(f))
+                        except Exception:
+                            pass
+                        formats[fmt] = formats.get(fmt, 0) + 1
+                    st.markdown("**格式统计:** " + ", ".join(f"`{k}`: {v}" for k, v in formats.items()))
+                    with st.expander("文件列表"):
+                        for f in all_files:
+                            st.markdown(f"- `{f.name}` ({f.stat().st_size / 1024:.1f} KB)")
+                    if st.button("批量导入", type="primary", key="batch_dir_import"):
+                        _do_batch_import(store, all_files, use_ai, split_n)
+                else:
+                    st.warning("目录下未发现数据文件")
             else:
-                st.warning("目录下未发现数据文件")
-        elif batch_dir:
-            st.error(f"目录不存在: {batch_dir}")
+                st.error(f"目录不存在: {batch_dir}")
 
     else:
         files = st.file_uploader(
@@ -470,7 +731,6 @@ def _do_batch_import(store, file_paths, use_ai, split_n):
 
     for i, fpath in enumerate(file_paths):
         fpath = Path(fpath) if not isinstance(fpath, Path) else fpath
-        status = "⏳"
         loaded = False
 
         try:
@@ -486,7 +746,6 @@ def _do_batch_import(store, file_paths, use_ai, split_n):
                     ds = add_cycle_summary(ds)
                     store.put(ds)
                 success_count += 1
-                status = "✅"
                 loaded = True
         except Exception:
             pass
@@ -506,17 +765,15 @@ def _do_batch_import(store, file_paths, use_ai, split_n):
                         ds = add_cycle_summary(ds)
                         store.put(ds)
                     ai_count += 1
-                    status = "🤖"
                     loaded = True
             except Exception:
                 pass
 
         if not loaded:
             fail_count += 1
-            status = "❌"
 
+        status = "✅" if loaded and ai_count == 0 else ("🤖" if loaded else "❌")
         results.append({"file": fpath.name, "status": status, "loaded": loaded})
-
         progress.progress((i + 1) / len(file_paths))
 
     with status_container:
@@ -531,6 +788,11 @@ def _do_batch_import(store, file_paths, use_ai, split_n):
             for r in results:
                 st.markdown(f"{r['status']} `{r['file']}`")
 
+    store.log_activity(
+        "batch_import",
+        _current_user(),
+        detail={"total": len(file_paths), "success": success_count, "ai": ai_count, "fail": fail_count},
+    )
     st.metric("数据库中实验总数", len(store.list_ids()))
 
 
@@ -542,7 +804,7 @@ def _render_directory_scan(store: DataStore):
     """)
 
     scan_dir = st.text_input(
-        "输入目录路径",
+        "输入目录路径 或 SMB 路径",
         placeholder="/path/to/experiment/data",
         key="scan_dir",
     )
@@ -562,129 +824,177 @@ def _render_directory_scan(store: DataStore):
     else:
         split_n = 0
 
-    if scan_dir and Path(scan_dir).is_dir():
-        col_scan, col_ai = st.columns(2)
-        with col_scan:
-            scan_btn = st.button("扫描目录", key="scan_btn")
-        with col_ai:
-            ai_scan_btn = st.button("AI 智能探索目录", type="primary", key="ai_scan_btn")
+    if scan_dir:
+        from lmbagent.data.smb_client import parse_unc_path
+        parsed = parse_unc_path(scan_dir)
+        if parsed:
+            _render_smb_directory_scan(store, parsed, use_ai, split_n)
+        elif Path(scan_dir).is_dir():
+            col_scan, col_ai = st.columns(2)
+            with col_scan:
+                scan_btn = st.button("扫描目录", key="scan_btn")
+            with col_ai:
+                ai_scan_btn = st.button("AI 智能探索目录", type="primary", key="ai_scan_btn")
 
-        if scan_btn:
-            with st.spinner("正在扫描..."):
-                candidates = scan_directory(scan_dir)
-            if not candidates:
-                st.warning("未发现数据文件。")
-            else:
-                st.session_state.scan_candidates = candidates
-                _display_scan_results(candidates)
+            if scan_btn:
+                with st.spinner("正在扫描..."):
+                    candidates = scan_directory(scan_dir)
+                if not candidates:
+                    st.warning("未发现数据文件。")
+                else:
+                    st.session_state.scan_candidates = candidates
+                    _display_scan_results(candidates)
 
-        if ai_scan_btn:
-            with st.spinner("AI 正在分析目录结构..."):
+            if ai_scan_btn:
+                with st.spinner("AI 正在分析目录结构..."):
+                    try:
+                        from lmbagent.data.catalog import smart_scan_directory
+                        result = smart_scan_directory(scan_dir)
+                    except Exception as e:
+                        st.error(f"AI 分析失败: {e}")
+                        result = None
+
+                if result:
+                    st.session_state.ai_scan_result = result
+                    if result.get("summary"):
+                        st.info(f"AI 分析: {result['summary']}")
+                    if result.get("patterns"):
+                        st.subheader("识别的模式")
+                        for p in result["patterns"]:
+                            st.markdown(f"- {p}")
+                    if result.get("groups"):
+                        st.subheader("文件分组")
+                        for group_name, files in result["groups"].items():
+                            with st.expander(f"{group_name} ({len(files)} 文件)"):
+                                for f in files:
+                                    st.markdown(f"  - `{f}`")
+                    if result.get("candidates"):
+                        st.session_state.scan_candidates = result["candidates"]
+                        _display_scan_results(result["candidates"])
+
+            if "scan_candidates" in st.session_state and st.session_state.scan_candidates:
+                candidates = st.session_state.scan_candidates
+                if st.button(f"导入全部 {len(candidates)} 个文件", key="import_all_btn"):
+                    _do_scan_import(store, candidates, use_ai, split_n)
+        else:
+            st.error(f"目录不存在: {scan_dir}")
+
+
+def _render_smb_directory_scan(store, parsed, use_ai, split_n):
+    smb_server, smb_share, smb_rel = parsed
+    if not _ensure_smb_creds(smb_server):
+        return
+    creds = _get_smb_creds()
+    from lmbagent.data.smb_client import walk as smb_walk, download_file as smb_dl
+
+    if st.button("扫描 SMB 目录", key="smb_scan_btn"):
+        with st.spinner("扫描中..."):
+            items = smb_walk(
+                smb_share, smb_rel, max_depth=2,
+                server=creds["server"], username=creds["username"], password=creds["password"],
+            )
+        store.log_activity("smb_browse", creds["username"],
+                           target=f"{smb_server}/{smb_share}/{smb_rel}")
+        data_ext = {".csv", ".xlsx", ".xls", ".txt", ".tsv", ".npy"}
+        data_items = [i for i in items if not i["is_dir"] and Path(i["name"]).suffix.lower() in data_ext]
+        if not data_items:
+            st.warning("未发现数据文件")
+            return
+        st.write(f"发现 {len(data_items)} 个数据文件:")
+        for item in data_items:
+            st.markdown(f"- `{item['path']}` ({item['size'] / 1024:.1f} KB)")
+        st.session_state.smb_scan_items = data_items
+
+    if "smb_scan_items" in st.session_state and st.session_state.smb_scan_items:
+        data_items = st.session_state.smb_scan_items
+        if st.button(f"导入全部 {len(data_items)} 个 SMB 文件", type="primary", key="smb_import_all"):
+            local_files = []
+            prog = st.progress(0)
+            for idx, item in enumerate(data_items):
                 try:
-                    from lmbagent.data.catalog import smart_scan_directory
-                    result = smart_scan_directory(scan_dir)
+                    local = smb_dl(
+                        smb_share, item["path"],
+                        server=creds["server"], username=creds["username"], password=creds["password"],
+                    )
+                    local_files.append(Path(local))
                 except Exception as e:
-                    st.error(f"AI 分析失败: {e}")
-                    result = None
+                    st.warning(f"下载失败 {item['name']}: {e}")
+                prog.progress((idx + 1) / len(data_items))
+            if local_files:
+                _do_batch_import(store, local_files, use_ai, split_n)
 
-            if result:
-                st.session_state.ai_scan_result = result
 
-                if result.get("summary"):
-                    st.info(f"AI 分析: {result['summary']}")
+def _do_scan_import(store, candidates, use_ai, split_n):
+    from lmbagent.data.llm_loader import llm_analyze_file, llm_smart_load
 
-                if result.get("patterns"):
-                    st.subheader("识别的模式")
-                    for p in result["patterns"]:
-                        st.markdown(f"- {p}")
+    progress = st.progress(0)
+    success_count = 0
+    ai_count = 0
+    fail_count = 0
+    split_count = 0
 
-                if result.get("groups"):
-                    st.subheader("文件分组")
-                    for group_name, files in result["groups"].items():
-                        with st.expander(f"{group_name} ({len(files)} 文件)"):
-                            for f in files:
-                                st.markdown(f"  - `{f}`")
+    with st.spinner("批量导入中..."):
+        for i, c in enumerate(candidates):
+            loaded = False
+            try:
+                ds = load_auto(str(c.path))
+                if c.design and ds.experiment_design is None:
+                    ds.experiment_design = c.design
+                if ds.num_data_points > 0:
+                    if split_n > 0 and ds.num_cycles > split_n:
+                        sub_datasets = split_by_cycles(ds, max_cycles_per_dataset=split_n)
+                        for sub_ds in sub_datasets:
+                            if c.design and sub_ds.experiment_design is None:
+                                sub_ds.experiment_design = c.design
+                            sub_ds = add_cycle_summary(sub_ds)
+                            store.put(sub_ds)
+                        split_count += len(sub_datasets) - 1
+                    else:
+                        ds = add_cycle_summary(ds)
+                        store.put(ds)
+                    c.imported = True
+                    c.data_id = ds.data_id
+                    success_count += 1
+                    loaded = True
+            except Exception:
+                pass
 
-                if result.get("candidates"):
-                    st.session_state.scan_candidates = result["candidates"]
-                    _display_scan_results(result["candidates"])
+            if not loaded and use_ai:
+                try:
+                    analysis = llm_analyze_file(str(c.path))
+                    ds = llm_smart_load(str(c.path), analysis=analysis)
+                    if ds and ds.num_data_points > 0:
+                        if c.design and ds.experiment_design is None:
+                            ds.experiment_design = c.design
+                        if split_n > 0 and ds.num_cycles > split_n:
+                            sub_datasets = split_by_cycles(ds, max_cycles_per_dataset=split_n)
+                            for sub_ds in sub_datasets:
+                                if c.design and sub_ds.experiment_design is None:
+                                    sub_ds.experiment_design = c.design
+                                sub_ds = add_cycle_summary(sub_ds)
+                                store.put(sub_ds)
+                            split_count += len(sub_datasets) - 1
+                        else:
+                            ds = add_cycle_summary(ds)
+                            store.put(ds)
+                        c.imported = True
+                        c.data_id = ds.data_id
+                        ai_count += 1
+                        loaded = True
+                except Exception:
+                    pass
 
-        if "scan_candidates" in st.session_state and st.session_state.scan_candidates:
-            candidates = st.session_state.scan_candidates
-            if st.button(f"导入全部 {len(candidates)} 个文件", key="import_all_btn"):
-                from lmbagent.data.llm_loader import llm_analyze_file, llm_smart_load
+            if not loaded:
+                fail_count += 1
 
-                progress = st.progress(0)
-                success_count = 0
-                ai_count = 0
-                fail_count = 0
-                split_count = 0
+            progress.progress((i + 1) / len(candidates))
 
-                with st.spinner("批量导入中..."):
-                    for i, c in enumerate(candidates):
-                        loaded = False
-                        try:
-                            ds = load_auto(str(c.path))
-                            if c.design and ds.experiment_design is None:
-                                ds.experiment_design = c.design
-                            if ds.num_data_points > 0:
-                                if split_n > 0 and ds.num_cycles > split_n:
-                                    sub_datasets = split_by_cycles(ds, max_cycles_per_dataset=split_n)
-                                    for sub_ds in sub_datasets:
-                                        if c.design and sub_ds.experiment_design is None:
-                                            sub_ds.experiment_design = c.design
-                                        sub_ds = add_cycle_summary(sub_ds)
-                                        store.put(sub_ds)
-                                    split_count += len(sub_datasets) - 1
-                                else:
-                                    ds = add_cycle_summary(ds)
-                                    store.put(ds)
-                                c.imported = True
-                                c.data_id = ds.data_id
-                                success_count += 1
-                                loaded = True
-                        except Exception:
-                            pass
-
-                        if not loaded and use_ai:
-                            try:
-                                analysis = llm_analyze_file(str(c.path))
-                                ds = llm_smart_load(str(c.path), analysis=analysis)
-                                if ds and ds.num_data_points > 0:
-                                    if c.design and ds.experiment_design is None:
-                                        ds.experiment_design = c.design
-                                    if split_n > 0 and ds.num_cycles > split_n:
-                                        sub_datasets = split_by_cycles(ds, max_cycles_per_dataset=split_n)
-                                        for sub_ds in sub_datasets:
-                                            if c.design and sub_ds.experiment_design is None:
-                                                sub_ds.experiment_design = c.design
-                                            sub_ds = add_cycle_summary(sub_ds)
-                                            store.put(sub_ds)
-                                        split_count += len(sub_datasets) - 1
-                                    else:
-                                        ds = add_cycle_summary(ds)
-                                        store.put(ds)
-                                    c.imported = True
-                                    c.data_id = ds.data_id
-                                    ai_count += 1
-                                    loaded = True
-                            except Exception:
-                                pass
-
-                        if not loaded:
-                            fail_count += 1
-
-                        progress.progress((i + 1) / len(candidates))
-
-                c1, c2, c3, c4 = st.columns(4)
-                c1.metric("✅ 标准加载", success_count)
-                c2.metric("🤖 AI 加载", ai_count)
-                c3.metric("❌ 失败", fail_count)
-                c4.metric("🔀 拆分数据集", split_count)
-                st.metric("数据库中实验总数", len(store.list_ids()))
-
-    elif scan_dir:
-        st.error(f"目录不存在: {scan_dir}")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("✅ 标准加载", success_count)
+    c2.metric("🤖 AI 加载", ai_count)
+    c3.metric("❌ 失败", fail_count)
+    c4.metric("🔀 拆分数据集", split_count)
+    st.metric("数据库中实验总数", len(store.list_ids()))
 
 
 def _display_scan_results(candidates):
@@ -797,9 +1107,6 @@ def _store_dataset(store, ds, split_n):
         store.put(ds)
         st.success(f"加载成功! ID: `{ds.data_id}`, {ds.num_data_points} points, {ds.num_cycles} cycles")
     st.session_state.active_dataset_id = ds.data_id
-
-
-
 
 
 def _show_file_preview(path: Path):

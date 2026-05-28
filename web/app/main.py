@@ -86,6 +86,14 @@ if "active_dataset_id" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+if "_dev_scheduler_started" not in st.session_state:
+    try:
+        from lmbagent.dev.scheduler import start_scheduler
+        start_scheduler()
+    except Exception:
+        pass
+    st.session_state._dev_scheduler_started = True
+
 with st.sidebar:
     st.title("🔋 LMBAgent")
     st.caption("Lithium Metal Battery Data Analysis")
@@ -94,7 +102,7 @@ with st.sidebar:
 
     page = st.radio(
         "导航",
-        ["📤 上传数据", "📊 数据集管理", "📈 可视化", "⚖️ 实验对比", "🔬 退化分析", "📐 DOE分析", "🔍 历史检索", "📝 结论管理", "📄 报告生成", "💬 AI 聊天"],
+        ["📤 上传数据", "📊 数据集管理", "📈 可视化", "⚖️ 实验对比", "🔬 退化分析", "📐 DOE分析", "🔍 历史检索", "📝 结论管理",         "📄 报告生成", "💬 AI 聊天", "🛠️ 开发工作台"],
         label_visibility="collapsed",
     )
 
@@ -149,6 +157,7 @@ PAGE_MAP = {
     "📝 结论管理": ("web.app.views.page_conclusions", "render_conclusions_page"),
     "📄 报告生成": ("web.app.views.page_report", "render_report_page"),
     "💬 AI 聊天": ("web.app.views.page_chat", "render_chat_page"),
+    "🛠️ 开发工作台": ("web.app.views.page_dev", "render_dev_page"),
 }
 
 st.markdown("""

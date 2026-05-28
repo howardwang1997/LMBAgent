@@ -107,3 +107,24 @@ def render_datasets_page():
                         st.rerun()
         except Exception as e:
             st.warning(f"数据集 `{data_id}` 渲染出错: {e}")
+
+    st.divider()
+
+    with st.expander("最近操作记录"):
+        activities = store.query_activity(limit=50)
+        if activities:
+            import pandas as pd
+            act_df = pd.DataFrame(activities)
+            act_df = act_df.rename(columns={
+                "user_domain": "用户",
+                "action": "操作",
+                "target": "目标",
+                "created_at": "时间",
+            })
+            if "detail" in act_df.columns:
+                act_df = act_df.drop(columns=["detail", "id"], errors="ignore")
+            else:
+                act_df = act_df.drop(columns=["id"], errors="ignore")
+            st.dataframe(act_df, hide_index=True, use_container_width=True)
+        else:
+            st.info("暂无操作记录")
