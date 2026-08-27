@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" data-pptx-page-role="content">
+  <rect id="bg" x="0" y="0" width="1280" height="720" fill="#FFFFFF"/>
+
+  <!-- Title -->
+  <g id="title-block" data-pptx-bounds="48 28 1184 48">
+    <text x="48" y="52" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="26" font-weight="700" fill="#111827">AMAR Data Pipeline · 技术架构</text>
+    <text x="1232" y="52" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6B7280" text-anchor="end">Edge → Storage → K8s ETL → Lakehouse → Agent</text>
+    <line x1="48" y1="68" x2="1232" y2="68" stroke="#E5E7EB" stroke-width="1.5"/>
+  </g>
+
+  <!-- Layer 1 Edge -->
+  <g id="layer-edge" data-pptx-bounds="48 88 380 200">
+    <rect x="48" y="88" width="380" height="200" rx="8" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1.5"/>
+    <text x="64" y="112" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#2563EB">01  EDGE / LAB</text>
+    <text x="64" y="130" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="11" fill="#6B7280">AMAR实验室</text>
+
+    <rect x="64" y="148" width="96" height="44" rx="6" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2"/>
+    <text x="112" y="166" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="11" fill="#111827" text-anchor="middle">测试终端</text>
+    <text x="112" y="182" font-family="Segoe UI, Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="middle">Modbus / USB</text>
+
+    <rect x="172" y="148" width="96" height="44" rx="6" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2"/>
+    <text x="220" y="166" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="11" fill="#111827" text-anchor="middle">测试终端</text>
+    <text x="220" y="182" font-family="Segoe UI, Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="middle">CSV / Binary</text>
+
+    <rect x="280" y="148" width="56" height="44" rx="6" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2" stroke-dasharray="4 3"/>
+    <text x="308" y="174" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#9CA3AF" text-anchor="middle">...</text>
+
+    <rect x="64" y="210" width="160" height="56" rx="6" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5"/>
+    <text x="144" y="232" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#111827" text-anchor="middle">实验室电脑</text>
+    <text x="144" y="250" font-family="Segoe UI, Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="middle">Edge Agent · buffer + retry</text>
+
+    <rect x="244" y="210" width="160" height="56" rx="6" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5"/>
+    <text x="324" y="232" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#111827" text-anchor="middle">AMAR NAS</text>
+    <text x="324" y="250" font-family="Segoe UI, Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="middle">NFS / SMB · staging</text>
+
+    <path d="M112 192 V204" stroke="#94A3B8" stroke-width="1.2" fill="none"/>
+    <path d="M220 192 V204" stroke="#94A3B8" stroke-width="1.2" fill="none"/>
+    <path d="M224 238 H244" stroke="#94A3B8" stroke-width="1.2" fill="none"/>
+    <text x="232" y="232" font-family="Segoe UI, Arial, sans-serif" font-size="8" fill="#64748B">NFS</text>
+  </g>
+
+  <!-- Layer 2 Sync -->
+  <g id="layer-store" data-pptx-bounds="468 88 360 200">
+    <rect x="468" y="88" width="360" height="200" rx="8" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1.5"/>
+    <text x="484" y="112" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#2563EB">02  SYNC + OBJECT STORAGE</text>
+    <text x="484" y="130" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="11" fill="#6B7280">智算 Bucket</text>
+
+    <rect x="484" y="148" width="150" height="116" rx="6" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5"/>
+    <text x="559" y="172" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#111827" text-anchor="middle">Sync Gateway</text>
+    <text x="559" y="192" font-family="Segoe UI, Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="middle">rclone / uploader</text>
+    <text x="559" y="210" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="10" fill="#2563EB" text-anchor="middle">断点续传</text>
+    <text x="559" y="226" font-family="Segoe UI, Arial, sans-serif" font-size="9" fill="#2563EB" text-anchor="middle">SHA256 去重</text>
+    <text x="559" y="246" font-family="Segoe UI, Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="middle">Daily Cron · 存量+增量</text>
+
+    <rect x="662" y="148" width="146" height="116" rx="6" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5"/>
+    <text x="735" y="172" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#111827" text-anchor="middle">AMAR Bucket</text>
+    <text x="735" y="192" font-family="Segoe UI, Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="middle">S3 / OSS</text>
+    <text x="735" y="210" font-family="Segoe UI, Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="middle">/raw/yyyy/mm/dd</text>
+    <text x="735" y="226" font-family="Segoe UI, Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="middle">landing · versioning</text>
+    <text x="735" y="246" font-family="Segoe UI, Arial, sans-serif" font-size="9" fill="#6B7280" text-anchor="middle">lifecycle policy</text>
+  </g>
+
+  <!-- Notes -->
+  <g id="callout" data-pptx-bounds="860 88 372 200">
+    <rect x="860" y="88" width="372" height="200" rx="8" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="1.5"/>
+    <text x="876" y="116" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#1D4ED8">NOTES</text>
+    <text x="876" y="144" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" fill="#1F2937">· 存量：全量同步一次</text>
+    <text x="876" y="166" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" fill="#1F2937">· 增量：每日 Cron 更新</text>
+    <text x="876" y="188" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" fill="#1F2937">· 断点续传：multipart / ETag</text>
+    <text x="876" y="210" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" fill="#1F2937">· 去重：content-hash (SHA256)</text>
+    <text x="876" y="240" font-family="Segoe UI, Arial, sans-serif" font-size="11" fill="#4B5563">脚本 → Pod · 清洗=CronJob · 入库=Job<tspan x="876" dy="20">ns: edge-sync / amar-etl / amar-agent</tspan></text>
+  </g>
+
+  <!-- Layer 3 ETL -->
+  <g id="layer-etl" data-pptx-bounds="48 320 1184 160">
+    <rect x="48" y="320" width="1184" height="160" rx="8" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1.5"/>
+    <text x="64" y="344" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#2563EB">03  K8S ETL CLUSTER · namespace: amar-etl</text>
+
+    <rect x="64" y="364" width="220" height="96" rx="6" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5"/>
+    <text x="174" y="390" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#111827" text-anchor="middle">Orchestrator</text>
+    <text x="174" y="412" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">Airflow / Argo Workflows</text>
+    <text x="174" y="430" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">DAG · ConfigMap / Secret</text>
+    <text x="174" y="448" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">Prometheus metrics</text>
+
+    <rect x="320" y="364" width="260" height="96" rx="6" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5"/>
+    <text x="450" y="390" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#111827" text-anchor="middle">Cleaning Pods</text>
+    <text x="450" y="412" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#2563EB" text-anchor="middle">K8s CronJob</text>
+    <text x="450" y="430" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">Spark / Python · schema validate</text>
+    <text x="450" y="448" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">output: Parquet / ORC</text>
+
+    <rect x="616" y="364" width="260" height="96" rx="6" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5"/>
+    <text x="746" y="390" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#111827" text-anchor="middle">Ingestion Pods</text>
+    <text x="746" y="412" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#2563EB" text-anchor="middle">K8s Job</text>
+    <text x="746" y="430" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">Spark SQL / Flink · Hive upsert</text>
+    <text x="746" y="448" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">partition overwrite · DLQ</text>
+
+    <rect x="912" y="364" width="296" height="96" rx="6" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2"/>
+    <text x="1060" y="390" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#111827" text-anchor="middle">K8s Platform</text>
+    <text x="1060" y="412" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">HPA · ResourceQuota · PVC</text>
+    <text x="1060" y="430" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">ServiceAccount · NetworkPolicy</text>
+    <text x="1060" y="448" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">Observability scrape targets</text>
+  </g>
+
+  <!-- Layer 4 Data -->
+  <g id="layer-data" data-pptx-bounds="48 512 560 168">
+    <rect x="48" y="512" width="560" height="168" rx="8" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1.5"/>
+    <text x="64" y="536" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#2563EB">04  LAKEHOUSE + SERVING</text>
+
+    <rect x="64" y="556" width="160" height="100" rx="6" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5"/>
+    <text x="144" y="584" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#111827" text-anchor="middle">Hive / Iceberg</text>
+    <text x="144" y="606" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">ODS → DWD → DWS</text>
+    <text x="144" y="624" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">Trino / Presto</text>
+    <text x="144" y="642" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">partition: date / device</text>
+
+    <rect x="244" y="556" width="160" height="100" rx="6" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5"/>
+    <text x="324" y="584" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#111827" text-anchor="middle">Cloud DB</text>
+    <text x="324" y="606" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">PostgreSQL / MySQL</text>
+    <text x="324" y="624" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">feature + metadata</text>
+    <text x="324" y="642" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">read replica</text>
+
+    <rect x="424" y="556" width="160" height="100" rx="6" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5"/>
+    <text x="504" y="584" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#111827" text-anchor="middle">Cache / Index</text>
+    <text x="504" y="606" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">Redis hot path</text>
+    <text x="504" y="624" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">Elasticsearch</text>
+    <text x="504" y="642" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">vector index (opt)</text>
+  </g>
+
+  <!-- Layer 5 Agent -->
+  <g id="layer-agent" data-pptx-bounds="640 512 592 168">
+    <rect x="640" y="512" width="592" height="168" rx="8" fill="#F8FAFC" stroke="#E5E7EB" stroke-width="1.5"/>
+    <text x="656" y="536" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#2563EB">05  AGENT PLATFORM · ns: amar-agent</text>
+
+    <rect x="656" y="556" width="140" height="100" rx="6" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5"/>
+    <text x="726" y="592" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#111827" text-anchor="middle">API Gateway</text>
+    <text x="726" y="614" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">Ingress / Kong</text>
+    <text x="726" y="632" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">Auth + rate limit</text>
+
+    <rect x="820" y="556" width="240" height="100" rx="6" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.8"/>
+    <text x="940" y="584" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700" fill="#111827" text-anchor="middle">Agent Runtime</text>
+    <text x="940" y="606" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#2563EB" text-anchor="middle">K8s Deployment + HPA</text>
+    <text x="940" y="624" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">RAG / Tool-calling Pods</text>
+    <text x="940" y="642" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">Hive + PG + Redis</text>
+
+    <rect x="1084" y="556" width="124" height="100" rx="6" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2"/>
+    <text x="1146" y="592" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#111827" text-anchor="middle">Obs</text>
+    <text x="1146" y="614" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">Prom + Graf</text>
+    <text x="1146" y="632" font-family="Segoe UI, Arial, sans-serif" font-size="10" fill="#6B7280" text-anchor="middle">OpenTelemetry</text>
+  </g>
+
+  <!-- Connectors -->
+  <g id="connectors" data-pptx-bounds="224 170 620 450">
+    <!-- edge to store -->
+    <path d="M428 188 H456" stroke="#2563EB" stroke-width="1.8" fill="none"/>
+    <polygon points="456,183 468,188 456,193" fill="#2563EB"/>
+    <!-- store internal -->
+    <path d="M634 206 H650" stroke="#2563EB" stroke-width="1.5" fill="none"/>
+    <polygon points="650,201 662,206 650,211" fill="#2563EB"/>
+    <text x="640" y="198" font-family="Segoe UI, Arial, sans-serif" font-size="8" fill="#2563EB">S3 PUT</text>
+    <!-- store to etl -->
+    <path d="M648 288 V312" stroke="#2563EB" stroke-width="1.8" fill="none"/>
+    <polygon points="643,312 648,324 653,312" fill="#2563EB"/>
+    <text x="656" y="308" font-family="Segoe UI, Arial, sans-serif" font-size="8" fill="#2563EB">S3 GET</text>
+    <!-- etl internal arrows -->
+    <path d="M284 412 H308" stroke="#2563EB" stroke-width="1.5" fill="none"/>
+    <polygon points="308,407 320,412 308,417" fill="#2563EB"/>
+    <path d="M580 412 H604" stroke="#2563EB" stroke-width="1.5" fill="none"/>
+    <polygon points="604,407 616,412 604,417" fill="#2563EB"/>
+    <!-- etl to data -->
+    <path d="M328 480 V504" stroke="#2563EB" stroke-width="1.8" fill="none"/>
+    <polygon points="323,504 328,512 333,504" fill="#2563EB"/>
+    <!-- data to agent -->
+    <path d="M608 606 H628" stroke="#2563EB" stroke-width="1.8" fill="none"/>
+    <polygon points="628,601 640,606 628,611" fill="#2563EB"/>
+    <!-- gateway to agent -->
+    <path d="M796 606 H808" stroke="#2563EB" stroke-width="1.5" fill="none"/>
+    <polygon points="808,601 820,606 808,611" fill="#2563EB"/>
+  </g>
+</svg>
