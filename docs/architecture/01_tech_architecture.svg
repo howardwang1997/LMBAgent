@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" data-pptx-page-role="content">
+  <rect id="bg" x="0" y="0" width="1280" height="720" fill="#0A1B2E"/>
+  <g id="grid" data-pptx-bounds="40 40 1200 640">
+    <path d="M40 40 H1240 M40 80 H1240 M40 120 H1240 M40 160 H1240 M40 200 H1240 M40 240 H1240 M40 280 H1240 M40 320 H1240 M40 360 H1240 M40 400 H1240 M40 440 H1240 M40 480 H1240 M40 520 H1240 M40 560 H1240 M40 600 H1240 M40 640 H1240 M40 680 H1240" stroke="#5BA3C9" stroke-width="0.6" opacity="0.18" fill="none"/>
+    <path d="M40 40 V680 M80 40 V680 M120 40 V680 M160 40 V680 M200 40 V680 M240 40 V680 M280 40 V680 M320 40 V680 M360 40 V680 M400 40 V680 M440 40 V680 M480 40 V680 M520 40 V680 M560 40 V680 M600 40 V680 M640 40 V680 M680 40 V680 M720 40 V680 M760 40 V680 M800 40 V680 M840 40 V680 M880 40 V680 M920 40 V680 M960 40 V680 M1000 40 V680 M1040 40 V680 M1080 40 V680 M1120 40 V680 M1160 40 V680 M1200 40 V680 M1240 40 V680" stroke="#5BA3C9" stroke-width="0.6" opacity="0.18" fill="none"/>
+  </g>
+
+  <g id="title-block" data-pptx-bounds="40 28 1200 54">
+    <rect x="40" y="28" width="1200" height="54" fill="none" stroke="#7EB6D9" stroke-width="1.2"/>
+    <line x1="40" y1="58" x2="1240" y2="58" stroke="#7EB6D9" stroke-width="0.8"/>
+    <text x="56" y="50" font-family="Consolas, Courier New, monospace" font-size="11" fill="#8BA3B8" letter-spacing="1.5">DWG-AMAR-01 | TECH ARCHITECTURE</text>
+    <text x="56" y="74" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#E8F1F8">AMAR Data Pipeline — 技术方案架构</text>
+    <text x="980" y="50" font-family="Consolas, Courier New, monospace" font-size="11" fill="#F0C14B" text-anchor="end">SCALE 1:1</text>
+    <text x="1224" y="74" font-family="Consolas, Courier New, monospace" font-size="11" fill="#8BA3B8" text-anchor="end">REV A | 1/1</text>
+  </g>
+
+  <g id="layer-edge" data-pptx-bounds="40 100 400 200">
+    <rect x="40" y="100" width="400" height="200" fill="#0D2438" stroke="#4A90B8" stroke-width="1.2" stroke-dasharray="4 3"/>
+    <text x="52" y="120" font-family="Consolas, Courier New, monospace" font-size="11" fill="#F0C14B" letter-spacing="1">1. EDGE / LAB</text>
+    <text x="52" y="138" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" fill="#8BA3B8">AMAR实验室</text>
+
+    <rect x="56" y="150" width="100" height="48" fill="none" stroke="#7EB6D9" stroke-width="1"/>
+    <text x="106" y="170" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="11" fill="#E8F1F8" text-anchor="middle">测试终端</text>
+    <text x="106" y="186" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Modbus/USB</text>
+
+    <rect x="168" y="150" width="100" height="48" fill="none" stroke="#7EB6D9" stroke-width="1"/>
+    <text x="218" y="170" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="11" fill="#E8F1F8" text-anchor="middle">测试终端</text>
+    <text x="218" y="186" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">CSV/Binary</text>
+
+    <rect x="280" y="150" width="60" height="48" fill="none" stroke="#7EB6D9" stroke-width="1" stroke-dasharray="3 2"/>
+    <text x="310" y="178" font-family="Consolas, Courier New, monospace" font-size="12" fill="#8BA3B8" text-anchor="middle">...</text>
+
+    <rect x="56" y="220" width="170" height="64" fill="none" stroke="#7EB6D9" stroke-width="1.4"/>
+    <text x="141" y="242" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#E8F1F8" text-anchor="middle">实验室电脑</text>
+    <text x="141" y="258" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Edge Agent Daemon</text>
+    <text x="141" y="272" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">buffer + retry</text>
+
+    <rect x="246" y="220" width="170" height="64" fill="none" stroke="#7EB6D9" stroke-width="1.4"/>
+    <text x="331" y="242" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#E8F1F8" text-anchor="middle">AMAR NAS</text>
+    <text x="331" y="258" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">NFS / SMB Share</text>
+    <text x="331" y="272" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">staging + checksum</text>
+
+    <path d="M106 198 V214" stroke="#7EB6D9" stroke-width="1" fill="none"/>
+    <path d="M218 198 V214" stroke="#7EB6D9" stroke-width="1" fill="none"/>
+    <path d="M226 252 H246" stroke="#7EB6D9" stroke-width="1.2" fill="none"/>
+    <text x="236" y="246" font-family="Consolas, Courier New, monospace" font-size="8" fill="#F0C14B">NFS</text>
+  </g>
+
+
+  <g id="layer-store" data-pptx-bounds="490 100 360 200">
+    <rect x="490" y="100" width="360" height="200" fill="#0D2438" stroke="#4A90B8" stroke-width="1.2" stroke-dasharray="4 3"/>
+    <text x="502" y="120" font-family="Consolas, Courier New, monospace" font-size="11" fill="#F0C14B" letter-spacing="1">2. SYNC + OBJECT STORAGE</text>
+    <text x="502" y="138" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" fill="#8BA3B8">智算 Bucket</text>
+
+    <rect x="510" y="155" width="150" height="120" fill="none" stroke="#7EB6D9" stroke-width="1.4"/>
+    <text x="585" y="178" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#E8F1F8" text-anchor="middle">Sync Gateway</text>
+    <text x="585" y="198" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">rclone / uploader</text>
+    <text x="585" y="214" font-family="Consolas, Courier New, monospace" font-size="9" fill="#F0C14B" text-anchor="middle">断点续传</text>
+    <text x="585" y="230" font-family="Consolas, Courier New, monospace" font-size="9" fill="#F0C14B" text-anchor="middle">SHA256 去重</text>
+    <text x="585" y="246" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Daily CronJob</text>
+    <text x="585" y="262" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">存量+增量</text>
+
+    <path d="M660 215 H678" stroke="#F0C14B" stroke-width="1.4" fill="none"/>
+    <polygon points="678,210 690,215 678,220" fill="#F0C14B"/>
+    <text x="684" y="205" font-family="Consolas, Courier New, monospace" font-size="8" fill="#F0C14B">S3 PUT</text>
+
+    <rect x="698" y="155" width="134" height="120" fill="none" stroke="#7EB6D9" stroke-width="1.4"/>
+    <text x="765" y="178" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#E8F1F8" text-anchor="middle">AMAR Bucket</text>
+    <text x="765" y="198" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">S3 / OSS</text>
+    <text x="765" y="214" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">/raw/yyyy/mm/dd</text>
+    <text x="765" y="230" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">landing zone</text>
+    <text x="765" y="246" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">versioning</text>
+    <text x="765" y="262" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">lifecycle</text>
+  </g>
+
+
+  <g id="layer-etl" data-pptx-bounds="40 350 810 160">
+    <rect x="40" y="350" width="810" height="160" fill="#0D2438" stroke="#4A90B8" stroke-width="1.2" stroke-dasharray="4 3"/>
+    <text x="52" y="370" font-family="Consolas, Courier New, monospace" font-size="11" fill="#F0C14B" letter-spacing="1">3. K8S ETL CLUSTER | ns: amar-etl</text>
+
+    <rect x="56" y="390" width="180" height="100" fill="none" stroke="#7EB6D9" stroke-width="1.4"/>
+    <text x="146" y="412" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#E8F1F8" text-anchor="middle">Orchestrator</text>
+    <text x="146" y="430" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Airflow / Argo</text>
+    <text x="146" y="446" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">DAG schedule</text>
+    <text x="146" y="462" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">ConfigMap/Secret</text>
+    <text x="146" y="478" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Prometheus</text>
+
+    <path d="M236 440 H254" stroke="#F0C14B" stroke-width="1.2" fill="none"/>
+    <polygon points="254,435 266,440 254,445" fill="#F0C14B"/>
+
+    <rect x="274" y="390" width="200" height="100" fill="none" stroke="#7EB6D9" stroke-width="1.4"/>
+    <text x="374" y="412" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#E8F1F8" text-anchor="middle">Cleaning Pods</text>
+    <text x="374" y="430" font-family="Consolas, Courier New, monospace" font-size="9" fill="#F0C14B" text-anchor="middle">K8s CronJob</text>
+    <text x="374" y="446" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Spark / Python</text>
+    <text x="374" y="462" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">schema + anomaly</text>
+    <text x="374" y="478" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">-&gt; Parquet / ORC</text>
+
+    <path d="M474 440 H492" stroke="#F0C14B" stroke-width="1.2" fill="none"/>
+    <polygon points="492,435 504,440 492,445" fill="#F0C14B"/>
+
+    <rect x="512" y="390" width="200" height="100" fill="none" stroke="#7EB6D9" stroke-width="1.4"/>
+    <text x="612" y="412" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#E8F1F8" text-anchor="middle">Ingestion Pods</text>
+    <text x="612" y="430" font-family="Consolas, Courier New, monospace" font-size="9" fill="#F0C14B" text-anchor="middle">K8s Job</text>
+    <text x="612" y="446" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Spark SQL / Flink</text>
+    <text x="612" y="462" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Hive upsert</text>
+    <text x="612" y="478" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">DLQ on failure</text>
+
+    <rect x="730" y="390" width="100" height="100" fill="none" stroke="#7EB6D9" stroke-width="1" stroke-dasharray="3 2"/>
+    <text x="780" y="430" font-family="Consolas, Courier New, monospace" font-size="10" fill="#8BA3B8" text-anchor="middle">HPA</text>
+    <text x="780" y="448" font-family="Consolas, Courier New, monospace" font-size="10" fill="#8BA3B8" text-anchor="middle">PVC</text>
+    <text x="780" y="466" font-family="Consolas, Courier New, monospace" font-size="10" fill="#8BA3B8" text-anchor="middle">Quota</text>
+  </g>
+
+  <g id="callout" data-pptx-bounds="880 100 360 200">
+    <rect x="880" y="100" width="360" height="200" fill="#0D2438" stroke="#F0C14B" stroke-width="1.2"/>
+    <text x="896" y="124" font-family="Consolas, Courier New, monospace" font-size="11" fill="#F0C14B" letter-spacing="1">ANNOTATION | NOTES</text>
+    <text x="896" y="152" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" fill="#E8F1F8">· 存量数据：全量同步一次</text>
+    <text x="896" y="174" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" fill="#E8F1F8">· 增量数据：每日 Cron 更新</text>
+    <text x="896" y="196" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" fill="#E8F1F8">· 断点续传：multipart / ETag</text>
+    <text x="896" y="218" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" fill="#E8F1F8">· 重复检测：content-hash</text>
+    <text x="896" y="248" font-family="Consolas, Courier New, monospace" font-size="10" fill="#8BA3B8">脚本 → Pod · 清洗=CronJob · 入库=Job<tspan x="896" dy="20">Namespaces: edge-sync / etl / agent</tspan></text>
+  </g>
+
+
+  <g id="layer-data" data-pptx-bounds="40 550 600 140">
+    <rect x="40" y="550" width="600" height="140" fill="#0D2438" stroke="#4A90B8" stroke-width="1.2" stroke-dasharray="4 3"/>
+    <text x="52" y="570" font-family="Consolas, Courier New, monospace" font-size="11" fill="#F0C14B" letter-spacing="1">4. LAKEHOUSE + SERVING</text>
+
+    <rect x="56" y="588" width="170" height="84" fill="none" stroke="#7EB6D9" stroke-width="1.4"/>
+    <text x="141" y="612" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#E8F1F8" text-anchor="middle">Hive / Iceberg</text>
+    <text x="141" y="630" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">ODS-&gt;DWD-&gt;DWS</text>
+    <text x="141" y="646" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">partition date/device</text>
+    <text x="141" y="662" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Trino / Presto</text>
+
+    <rect x="246" y="588" width="170" height="84" fill="none" stroke="#7EB6D9" stroke-width="1.4"/>
+    <text x="331" y="612" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#E8F1F8" text-anchor="middle">Cloud DB</text>
+    <text x="331" y="630" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">PostgreSQL / MySQL</text>
+    <text x="331" y="646" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">feature / metadata</text>
+    <text x="331" y="662" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">read replica</text>
+
+    <rect x="436" y="588" width="180" height="84" fill="none" stroke="#7EB6D9" stroke-width="1.4"/>
+    <text x="526" y="612" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#E8F1F8" text-anchor="middle">Cache / Index</text>
+    <text x="526" y="630" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Redis hot path</text>
+    <text x="526" y="646" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Elasticsearch</text>
+    <text x="526" y="662" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">vector index (opt)</text>
+  </g>
+
+
+  <g id="layer-agent" data-pptx-bounds="680 550 560 140">
+    <rect x="680" y="550" width="560" height="140" fill="#0D2438" stroke="#4A90B8" stroke-width="1.2" stroke-dasharray="4 3"/>
+    <text x="692" y="570" font-family="Consolas, Courier New, monospace" font-size="11" fill="#F0C14B" letter-spacing="1">5. AGENT PLATFORM | ns: amar-agent</text>
+
+    <rect x="700" y="588" width="130" height="84" fill="none" stroke="#7EB6D9" stroke-width="1.4"/>
+    <text x="765" y="618" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#E8F1F8" text-anchor="middle">API Gateway</text>
+    <text x="765" y="638" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Ingress/Kong</text>
+    <text x="765" y="654" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Auth + RL</text>
+
+    <path d="M830 630 H848" stroke="#F0C14B" stroke-width="1.2" fill="none"/>
+    <polygon points="848,625 860,630 848,635" fill="#F0C14B"/>
+
+    <rect x="868" y="588" width="220" height="84" fill="none" stroke="#F0C14B" stroke-width="1.6"/>
+    <text x="978" y="612" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#E8F1F8" text-anchor="middle">Agent Runtime</text>
+    <text x="978" y="630" font-family="Consolas, Courier New, monospace" font-size="9" fill="#F0C14B" text-anchor="middle">K8s Deployment + HPA</text>
+    <text x="978" y="646" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">RAG / Tool-calling Pods</text>
+    <text x="978" y="662" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Hive + PG + Redis</text>
+
+    <rect x="1108" y="588" width="112" height="84" fill="none" stroke="#7EB6D9" stroke-width="1"/>
+    <text x="1164" y="618" font-family="Microsoft YaHei, Segoe UI, Arial, sans-serif" font-size="11" font-weight="700" fill="#E8F1F8" text-anchor="middle">Obs</text>
+    <text x="1164" y="638" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">Prom+Graf</text>
+    <text x="1164" y="654" font-family="Consolas, Courier New, monospace" font-size="9" fill="#8BA3B8" text-anchor="middle">OTel</text>
+  </g>
+
+  <g id="connectors" data-pptx-bounds="440 250 450 390">
+    <path d="M440 250 H470" stroke="#F0C14B" stroke-width="1.6" fill="none"/>
+  <polygon points="470,245 482,250 470,255" fill="#F0C14B"/>
+    <path d="M850 300 V330" stroke="#F0C14B" stroke-width="1.6" fill="none"/>
+  <polygon points="845,330 850,342 855,330" fill="#F0C14B"/>
+  <text x="860" y="325" font-family="Consolas, Courier New, monospace" font-size="8" fill="#F0C14B">S3 GET</text>
+    <path d="M440 510 V530" stroke="#F0C14B" stroke-width="1.6" fill="none"/>
+  <polygon points="435,530 440,542 445,530" fill="#F0C14B"/>
+    <path d="M640 620 H662" stroke="#F0C14B" stroke-width="1.6" fill="none"/>
+  <polygon points="662,615 674,620 662,625" fill="#F0C14B"/>
+  </g>
+</svg>
